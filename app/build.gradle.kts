@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "com.enkod.enkodpushlibrary"
-    compileSdk = 33
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.enkod.enkodpushlibrary"
