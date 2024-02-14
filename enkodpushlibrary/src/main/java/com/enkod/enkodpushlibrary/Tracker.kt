@@ -29,17 +29,10 @@ data class SessionIdResponse(
     var session_id: String = ""
 )
 
-data class PersonResponse(
-    var cart: JsonObject,
-    var favourite: JsonObject,
-    var session: String,
-)
-
 data class UpdateTokenResponse(
     var sessionId: String = "",
     var token: String = ""
 )
-
 
 
 data class GetTokenResponse(

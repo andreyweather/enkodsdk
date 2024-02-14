@@ -8,6 +8,9 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.annotation.RequiresApi
+import com.enkod.enkodpushlibrary.EnkodPushLibrary.logInfo
+import com.enkod.enkodpushlibrary.Preferences.ACCOUNT_TAG
+import com.enkod.enkodpushlibrary.Preferences.TAG
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -15,10 +18,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class UpdateTokenService : Service() {
-
-    private val TAG = "EnkodPushLibrary"
-    private val ACCOUNT_TAG: String = "${TAG}_ACCOUNT"
-
 
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate() {
@@ -36,7 +35,7 @@ class UpdateTokenService : Service() {
 
             delay(3000)
 
-            EnkodPushLibrary.initRetrofit()
+            EnkodPushLibrary.initRetrofit(applicationContext)
 
 
             val preferences = applicationContext.getSharedPreferences(TAG, Context.MODE_PRIVATE)
@@ -46,7 +45,7 @@ class UpdateTokenService : Service() {
 
                 try {
 
-                    EnkodPushLibrary.initRetrofit()
+                    EnkodPushLibrary.initRetrofit(applicationContext)
 
                     FirebaseMessaging.getInstance().deleteToken()
 
@@ -76,14 +75,16 @@ class UpdateTokenService : Service() {
                                         }
 
                                     } else {
-                                        Log.d("doWork", "error_token_receiving")
+
+                                        logInfo("error get new token in UpdateTokenService")
 
                                         stopSelf()
                                     }
                                 }
 
                             } else {
-                                Log.d("doWork", "error_token_delete")
+
+                                logInfo("error deletion token in UpdateTokenService")
 
                                 stopSelf()
                             }
@@ -91,12 +92,19 @@ class UpdateTokenService : Service() {
 
                 } catch (e: Exception) {
 
-                    Log.d("doWork", "error_fcm_request")
+                    logInfo("error in UpdateTokenService $e")
 
                     stopSelf()
 
                 }
             }
+        }
+
+        CoroutineScope(Dispatchers.IO).launch {
+
+            delay(15000)
+            stopSelf()
+
         }
     }
 

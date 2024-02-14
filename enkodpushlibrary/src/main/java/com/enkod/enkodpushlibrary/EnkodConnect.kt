@@ -3,7 +3,10 @@ package com.enkod.enkodpushlibrary
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.util.Log
+import com.enkod.enkodpushlibrary.Preferences.START_TIMER_TAG
+import com.enkod.enkodpushlibrary.Preferences.TAG
+import com.enkod.enkodpushlibrary.Preferences.TIME_TAG
+import com.enkod.enkodpushlibrary.Preferences.WORKER_TAG
 import com.google.android.gms.tasks.OnCompleteListener
 import com.google.firebase.messaging.FirebaseMessaging
 
@@ -24,6 +27,7 @@ class EnkodConnect(
     private var timeTokenUpdate: Int?
     private var timeRefreshAppInMemory: Long?
 
+
     init {
 
         account = _account
@@ -34,23 +38,13 @@ class EnkodConnect(
 
     }
 
-    private val TAG = "EnkodPushLibrary"
-    private val WORKER_TAG: String = "${TAG}_WORKER"
-    private val START_TIMER_TAG: String = "${TAG}_STARTTIMER"
-    private val TIME_TAG: String = "${TAG}_TIME"
 
     fun start(context: Context) {
 
 
-        Log.d(
-            "EnkodConnect_options",
-            "account $account, tokenUpdate $tokenUpdate, refreshAppInMemory $refreshAppInMemory, timeTokenUpdate $timeTokenUpdate, timeRefreshAppInMemory $timeRefreshAppInMemory"
-        )
-
         val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
         val preferencesWorker = preferences.getString(WORKER_TAG, null)
         val preferencesStartTimer = preferences.getString(START_TIMER_TAG, null)
-
 
 
         if (preferencesStartTimer == null) {
@@ -80,11 +74,7 @@ class EnkodConnect(
 
                 FirebaseMessaging.getInstance().token.addOnCompleteListener(OnCompleteListener { task ->
                     if (!task.isSuccessful) {
-                        Log.d(
-                            "new_token",
-                            "Fetching FCM registration token failed",
-                            task.exception
-                        )
+
                         return@OnCompleteListener
                     }
 
@@ -101,8 +91,9 @@ class EnkodConnect(
             }
 
         } else {
+
             EnkodPushLibrary.isOnlineStatus(false)
-            Log.d("Internet", "Интернет отсутствует")
+
         }
 
         if (tokenUpdate != null && tokenUpdate && timeTokenUpdate != null) {
@@ -116,14 +107,11 @@ class EnkodConnect(
 
     private fun tokenUpdate(context: Context, timeInHours: Int) {
 
-        Log.d ("tokenUpdate", "Start")
-
         val timeUpdateInMillis: Long = (timeInHours * 3600000).toLong()
 
         val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
         val preferencesTime = preferences.getLong(TIME_TAG, 1)
 
-        Log.d ("tokenUpdate", (System.currentTimeMillis() - preferencesTime).toString())
 
         if (isAppInforegrounded()) {
 
@@ -131,8 +119,6 @@ class EnkodConnect(
 
                 if ((System.currentTimeMillis() - preferencesTime) > timeUpdateInMillis) {
 
-
-                    Log.d ("tokenUpdate", "Update")
 
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         context.startForegroundService(

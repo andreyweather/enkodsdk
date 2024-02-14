@@ -21,6 +21,19 @@ import com.enkod.enkodpushlibrary.EnkodPushLibrary.downloadImageToPush
 import com.enkod.enkodpushlibrary.EnkodPushLibrary.initPreferences
 import com.enkod.enkodpushlibrary.EnkodPushLibrary.initRetrofit
 import com.enkod.enkodpushlibrary.EnkodPushLibrary.processMessage
+import com.enkod.enkodpushlibrary.Preferences.EXIT_TAG
+import com.enkod.enkodpushlibrary.Preferences.MESSAGEID_TAG
+import com.enkod.enkodpushlibrary.Preferences.TAG
+import com.enkod.enkodpushlibrary.Variables.body
+import com.enkod.enkodpushlibrary.Variables.exitStatusN
+import com.enkod.enkodpushlibrary.Variables.imageUrl
+import com.enkod.enkodpushlibrary.Variables.ledColor
+import com.enkod.enkodpushlibrary.Variables.ledOffMs
+import com.enkod.enkodpushlibrary.Variables.ledOnMs
+import com.enkod.enkodpushlibrary.Variables.messageId
+import com.enkod.enkodpushlibrary.Variables.soundOn
+import com.enkod.enkodpushlibrary.Variables.title
+import com.enkod.enkodpushlibrary.Variables.vibrationOn
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import rx.Observable
@@ -29,10 +42,6 @@ import rx.android.schedulers.AndroidSchedulers
 import rx.schedulers.Schedulers
 import java.util.concurrent.Callable
 
-
-private val TAG = "EnkodPushLibrary"
-private val EXIT_TAG: String = "${TAG}_EXIT"
-private val MESSAGEID_TAG = "${TAG}_MESSAGEID"
 
 class EnkodPushMessagingService : FirebaseMessagingService() {
 
@@ -44,7 +53,7 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
     override fun onNewToken(token: String) {
         super.onNewToken(token)
 
-        Log.d("onNewToken", token.toString())
+        Log.d("onNewToken", token)
 
     }
 
@@ -60,36 +69,31 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
 
         super.onMessageReceived(message)
-        Log.d("onMessageReceived", message.toString())
 
-
-        val variable = Variables
-
-
-        // EXIT_TAG - preferences с содержанием поля "noexit" открывают доступ к методу startForeground() в InternetService
 
         val preferences = applicationContext.getSharedPreferences(TAG, MODE_PRIVATE)
         preferences.edit()
 
-            .putString(EXIT_TAG, "noexit")
+            .putString(EXIT_TAG, exitStatusN)
             .apply()
 
         preferences.edit()
             .remove(MESSAGEID_TAG).apply()
 
-
         preferences.edit()
-            .putString(MESSAGEID_TAG, "${message.data["messageId"]}")
+            .putString(MESSAGEID_TAG, "${message.data[messageId]}")
             .apply()
 
 
-        if (!message.data["image"].isNullOrEmpty()) {
+        if (!message.data[imageUrl].isNullOrEmpty()) {
 
-            val userAgent = System.getProperty("http.agent")
-
+            val userAgent = when (val agent: String? = System.getProperty("http.agent")) {
+                null -> "android"
+                else -> agent
+            }
             val url = GlideUrl(
 
-                message.data["image"], LazyHeaders.Builder()
+                message.data[imageUrl], LazyHeaders.Builder()
                     .addHeader(
                         "User-Agent",
                         userAgent
@@ -114,8 +118,6 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
 
                     override fun onError(e: Throwable) {
 
-                        Log.d("onError_one", e.message.toString())
-
                         startService(message)
 
                     }
@@ -128,8 +130,6 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
 
                             val data = message.data
 
-                            Log.d("message", data.toString())
-
                             var url = ""
 
                             if (data.containsKey("url") && data[url] != null) {
@@ -138,7 +138,7 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
 
                             val builder = NotificationCompat.Builder(
                                 applicationContext,
-                                EnkodPushLibrary.CHANEL_Id
+                                EnkodPushLibrary.chanelEnkod
                             )
 
                             val pendingIntent: PendingIntent = EnkodPushLibrary.getIntent(
@@ -147,18 +147,18 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
 
                             builder
 
-                                .setIcon(applicationContext, data["imageUrl"])
+                                .setIcon(applicationContext, data[imageUrl])
                                 .setLights(
-                                    get(variable.ledColor),
-                                    get(variable.ledOnMs),
-                                    get(variable.ledOffMs
+                                    get(ledColor),
+                                    get(ledOnMs),
+                                    get(ledOffMs
                                     )
                                 )
-                                .setVibrate(get(variable.vibrationOn).toBoolean())
-                                .setSound(get(variable.soundOn).toBoolean())
+                                .setVibrate(get(vibrationOn).toBoolean())
+                                .setSound(get(soundOn).toBoolean())
                                 .setColor(Color.BLACK)
-                                .setContentTitle(data[variable.title])
-                                .setContentText(data[variable.body])
+                                .setContentTitle(data[title])
+                                .setContentText(data[body])
                                 .setContentIntent(pendingIntent)
                                 .setAutoCancel(true)
                                 .addActions(applicationContext, message.data)
@@ -179,7 +179,7 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
                                         )
                                 } catch (e: Exception) {
 
-
+                                    EnkodPushLibrary.logInfo("error push img builder" )
                                 }
                             }
 
@@ -193,13 +193,10 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
                                     return
                                 }
 
-                                notify(message.data[variable.messageId]!!.toInt(), builder.build())
+                                notify(message.data[messageId]!!.toInt(), builder.build())
 
                             }
                         }
-
-                        Log.d("onNext", bitmap.toString())
-
                     }
                 })
 
@@ -208,7 +205,7 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
         }
 
 
-        initRetrofit()
+        initRetrofit(applicationContext)
         initPreferences(this)
 
     }
@@ -220,8 +217,6 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
 
         if (!isAppInforegrounded()) {
 
-            Log.d("start_service", "start")
-
             val service = Intent(this, InternetService::class.java)
             this.startForegroundService(service)
             createdServiceNotification(this, message)
@@ -231,9 +226,7 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
             downloadImageToPush(this, message)
 
         }
-
     }
-
 }
 
 fun isAppInforegrounded(): Boolean {

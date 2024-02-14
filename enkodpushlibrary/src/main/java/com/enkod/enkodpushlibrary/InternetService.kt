@@ -11,6 +11,10 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat.Builder
+import com.enkod.enkodpushlibrary.EnkodPushLibrary.logInfo
+import com.enkod.enkodpushlibrary.Preferences.EXIT_TAG
+import com.enkod.enkodpushlibrary.Preferences.TAG
+import com.enkod.enkodpushlibrary.Variables.exitStatusE
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -18,13 +22,8 @@ import kotlinx.coroutines.launch
 import kotlin.system.exitProcess
 
 class InternetService : Service() {
-    private val TAG = "EnkodPushLibrary"
-    private val EXIT_TAG: String = "${TAG}_EXIT"
-
 
     override fun onCreate() {
-
-        Log.d("service_state", "start_onCreated")
 
         super.onCreate()
 
@@ -71,10 +70,9 @@ class InternetService : Service() {
                                     Context.MODE_PRIVATE
                                 )
                             preferences.edit()
-                                .putString(EXIT_TAG, "exit")
+                                .putString(EXIT_TAG, exitStatusE)
                                 .apply()
 
-                            Log.d("service_state", "out_tag_exit")
 
                             delay(200)
                             exitProcess(0)
@@ -87,7 +85,7 @@ class InternetService : Service() {
                         )
                         val exitPref = preferences.getString(EXIT_TAG, null)
 
-                        if (exitPref.toString() == "exit") {
+                        if (exitPref.toString() == exitStatusE) {
 
                             if (!isAppInforegrounded()) {
 
@@ -105,8 +103,6 @@ class InternetService : Service() {
                         startForeground(1, notification)
                         stopSelf()
 
-                        Log.d("service_state", "foreground")
-
                     }
 
                     val preferences = applicationContext.getSharedPreferences(
@@ -116,11 +112,10 @@ class InternetService : Service() {
                     val exitPref = preferences.getString(EXIT_TAG, null)
 
 
-                    if (exitPref.toString() != "exit") {
+                    if (exitPref.toString() != exitStatusE) {
 
                         startForeground(1, notification)
 
-                        Log.d("service_state", "start_service_in")
 
                         var seflJob = true
 
@@ -163,7 +158,7 @@ class InternetService : Service() {
             }
         } catch (e: Exception) {
 
-            Log.d("service_exeption", e.toString())
+            logInfo("internet service exception $e")
 
         }
     }

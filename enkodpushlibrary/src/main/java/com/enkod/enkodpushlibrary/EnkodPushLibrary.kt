@@ -27,6 +27,24 @@ import androidx.work.WorkManager
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.model.GlideUrl
 import com.bumptech.glide.load.model.LazyHeaders
+import com.enkod.enkodpushlibrary.Preferences.ACCOUNT_TAG
+import com.enkod.enkodpushlibrary.Preferences.DEV_TAG
+import com.enkod.enkodpushlibrary.Preferences.MESSAGEID_TAG
+import com.enkod.enkodpushlibrary.Preferences.SESSION_ID_TAG
+import com.enkod.enkodpushlibrary.Preferences.START_TIMER_TAG
+import com.enkod.enkodpushlibrary.Preferences.TAG
+import com.enkod.enkodpushlibrary.Preferences.TIME_TAG
+import com.enkod.enkodpushlibrary.Preferences.TOKEN_TAG
+import com.enkod.enkodpushlibrary.Preferences.WORKER_TAG
+import com.enkod.enkodpushlibrary.Variables.body
+import com.enkod.enkodpushlibrary.Variables.ledColor
+import com.enkod.enkodpushlibrary.Variables.ledOffMs
+import com.enkod.enkodpushlibrary.Variables.ledOnMs
+import com.enkod.enkodpushlibrary.Variables.messageId
+import com.enkod.enkodpushlibrary.Variables.personId
+import com.enkod.enkodpushlibrary.Variables.soundOn
+import com.enkod.enkodpushlibrary.Variables.title
+import com.enkod.enkodpushlibrary.Variables.vibrationOn
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.RemoteMessage
 import com.google.gson.Gson
@@ -58,20 +76,9 @@ import java.util.concurrent.TimeUnit
 
 object EnkodPushLibrary {
 
-    private const val TAG = "EnkodPushLibrary"
-    private const val SESSION_ID_TAG: String = "${TAG}_SESSION_ID"
-    private const val TOKEN_TAG: String = "${TAG}_TOKEN"
-    private const val ACCOUNT_TAG: String = "${TAG}_ACCOUNT"
-    private const val MESSAGEID_TAG = "${TAG}_MESSAGEID"
-    private const val WORKER_TAG = "${TAG}_WORKER"
-    private const val START_TIMER_TAG = "${TAG}_STARTTIMER"
-    private const val TIME_TAG  = "${TAG}_TIME"
+    private const val baseUrl = "https://ext.enkod.ru/"
+    internal val chanelEnkod = "enkod_lib_1"
 
-
-
-    private val initLibObserver = InitLibObserver(false)
-
-    internal val CHANEL_Id = "enkod_lib_1"
     internal var exit = 0
     internal var exitSelf = 0
     internal var serviceCreated = false
@@ -89,6 +96,7 @@ object EnkodPushLibrary {
     internal val vibrationPattern = longArrayOf(1500, 500)
     internal val defaultIconId: Int = R.drawable.ic_launcher_background
 
+    private val initLibObserver = InitLibObserver(false)
     private var onPushClickCallback: (Bundle, String) -> Unit = { _, _ -> }
     private var onDynamicLinkClick: ((String) -> Unit)? = null
     internal var newTokenCallback: (String) -> Unit = {}
@@ -106,7 +114,7 @@ object EnkodPushLibrary {
             annotations: Array<Annotation>,
             retrofit: Retrofit
         ): Converter<ResponseBody, *> {
-            Log.d("Library", "responseBodyConverter")
+
             val delegate: Converter<ResponseBody, *> =
                 retrofit.nextResponseBodyConverter<Any>(this, type, annotations)
             return Converter { body ->
@@ -122,17 +130,18 @@ object EnkodPushLibrary {
         DYNAMIC_LINK, OPEN_URL, OPEN_APP;
 
         fun get(): String {
-            Log.d("Library", "get")
+
             return when (this) {
                 DYNAMIC_LINK -> "0"
                 OPEN_URL -> "1"
                 OPEN_APP -> "2"
+
             }
         }
 
         companion object {
             fun get(intent: String?): OpenIntent {
-                Log.d("Library", "get")
+
                 return when (intent) {
                     "0" -> DYNAMIC_LINK
                     "1" -> OPEN_URL
@@ -143,7 +152,7 @@ object EnkodPushLibrary {
         }
     }
 
-  internal fun initPreferences(context: Context) {
+    internal fun initPreferences(context: Context) {
 
         val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
 
@@ -159,9 +168,8 @@ object EnkodPushLibrary {
     }
 
 
-    internal fun initRetrofit() {
+    internal fun initRetrofit(context: Context) {
 
-        Log.d("Library", "initRetrofit")
         client = OkHttpClient.Builder()
             .callTimeout(60L, TimeUnit.SECONDS)
             .connectTimeout(60L, TimeUnit.SECONDS)
@@ -175,10 +183,16 @@ object EnkodPushLibrary {
             )
             .build()
 
-        var baseUrl = "http://dev.ext.enkod.ru/"
+        var urlRetrofit = ""
+
+        urlRetrofit = when (dev(context)) {
+
+            null -> baseUrl
+            else -> dev(context)!!
+        }
 
         retrofit = Retrofit.Builder()
-            .baseUrl(baseUrl)
+            .baseUrl(urlRetrofit)
             .addConverterFactory(NullOnEmptyConverterFactory())
             .addConverterFactory(GsonConverterFactory.create())
             .client(client)
@@ -188,9 +202,9 @@ object EnkodPushLibrary {
     }
 
 
-    internal fun init (context: Context, account: String, token: String? = null) {
+    internal fun init(context: Context, account: String, token: String? = null) {
 
-        initRetrofit()
+        initRetrofit(context)
         setClientName(context, account)
         initPreferences(context)
 
@@ -201,16 +215,12 @@ object EnkodPushLibrary {
                 if (sessionId.isNullOrEmpty()) getSessionIdFromApi(context)
                 if (!sessionId.isNullOrEmpty()) startSession()
 
-                Log.d("lib_lvl", "no_fb")
-
             }
 
             else -> {
 
-
                 if (this.token == token && !sessionId.isNullOrEmpty()) {
 
-                    Log.d("lib_lvl", "start_session_fb_true")
                     startSession()
                 }
 
@@ -222,21 +232,15 @@ object EnkodPushLibrary {
                         .apply()
                     this.token = token
 
-                    Log.d("lib_lvl", this.token.toString())
-
 
                     if (!sessionId.isNullOrEmpty()) {
 
-                        Log.d("lib_lvl", "update_fb_true")
-
                         updateToken(sessionId, token)
-
                     }
                 }
 
                 if (sessionId.isNullOrEmpty()) {
 
-                    Log.d("lib_lvl", "created_session_fb_true")
                     getSessionIdFromApi(context)
 
                 }
@@ -244,9 +248,7 @@ object EnkodPushLibrary {
         }
     }
 
-    private fun getSessionIdFromApi(ctx: Context) {
-
-        Log.d("lib_lvl", "getSessionIdFromApi")
+    private fun getSessionIdFromApi(context: Context) {
 
         retrofit.getSessionId(getClientName()).enqueue(object : Callback<SessionIdResponse> {
             override fun onResponse(
@@ -255,19 +257,35 @@ object EnkodPushLibrary {
             ) {
                 response.body()?.session_id?.let {
 
-                    Log.d("new_session", it)
-                    newSessions(ctx, it)
-                    Toast.makeText(ctx, "connect_getSessionIdFromApi", Toast.LENGTH_LONG).show()
+                    newSessions(context, it)
+
+                    logInfo("created_newSession")
+
+                    when (dev(context)) {
+                        null -> return
+                        else ->  Toast.makeText(context, "connect_getSessionIdFromApi", Toast.LENGTH_LONG).show()
+                    }
 
                 } ?: run {
 
-                    Toast.makeText(ctx, "error_getSessionIdFromApi", Toast.LENGTH_LONG).show()
+                    logInfo("error_created_newSession")
+
+                    when (dev(context)) {
+                        null -> return
+                        else ->  Toast.makeText(context, "error_getSessionIdFromApi", Toast.LENGTH_LONG).show()
+                    }
                 }
             }
 
             override fun onFailure(call: Call<SessionIdResponse>, t: Throwable) {
 
-                Toast.makeText(ctx, "error: ${t.message}", Toast.LENGTH_LONG).show()
+                logInfo("error_created session retrofit $t")
+
+                when (dev(context)) {
+                    null -> return
+                    else ->  Toast.makeText(context, "error: ${t.message}", Toast.LENGTH_LONG).show()
+                }
+
             }
         })
     }
@@ -275,10 +293,8 @@ object EnkodPushLibrary {
 
     private fun newSessions(ctx: Context, nsession: String?) {
 
-        Log.d("lib_lvl", "newSessions")
-
-
         val preferences = ctx.getSharedPreferences(TAG, Context.MODE_PRIVATE)
+
         var newPreferencesToken = preferences.getString(TOKEN_TAG, null)
 
         preferences.edit()
@@ -287,21 +303,17 @@ object EnkodPushLibrary {
 
         this.sessionId = nsession
 
-        Log.d("session", this.sessionId.toString())
-        Log.d("new_token", newPreferencesToken.toString())
-
         if (newPreferencesToken.isNullOrEmpty()) {
 
-            subscribeToPush (getClientName(), getSession(), token)
+            subscribeToPush(getClientName(), getSession(), token)
 
         } else updateToken(nsession, newPreferencesToken)
 
     }
 
 
-     private fun updateToken(session: String?, token: String?) {
+    private fun updateToken(session: String?, token: String?) {
 
-        Log.d("lib_lvl", "updateToken")
         retrofit.updateToken(
             getClientName(),
             getSession(),
@@ -331,7 +343,7 @@ object EnkodPushLibrary {
         if (!this.token.isNullOrEmpty()) {
             tokenSession = this.token!!
         }
-        Log.d("lib_lvl", "startSession")
+
         tokenSession?.let {
             logInfo("on start session \n")
             sessionId?.let { it1 ->
@@ -342,9 +354,8 @@ object EnkodPushLibrary {
                             response: Response<SessionIdResponse>
                         ) {
                             logInfo("session started ${response.body()?.session_id}")
-                            //isSessionStarted = true
                             newTokenCallback(it)
-                            subscribeToPush (getClientName(), getSession(), token)
+                            subscribeToPush(getClientName(), getSession(), token)
                         }
 
                         override fun onFailure(call: Call<SessionIdResponse>, t: Throwable) {
@@ -369,8 +380,6 @@ object EnkodPushLibrary {
         var token: String? = if (token != null) token else t
 
 
-        Log.d("lib_lvl", "subscribeToPush")
-
         retrofit.subscribeToPushToken(
             client!!,
             session!!,
@@ -392,14 +401,12 @@ object EnkodPushLibrary {
             }
 
             override fun onFailure(call: Call<UpdateTokenResponse>, t: Throwable) {
-                logInfo("MESSAGE ${t.localizedMessage}")
+                logInfo("no subscribed ${t.localizedMessage}")
 
             }
 
         })
     }
-
-
 
     fun addContact(
 
@@ -467,26 +474,23 @@ object EnkodPushLibrary {
                             call: Call<Unit>,
                             response: Response<Unit>
                         ) {
-                            val msg = "ok"
-                            Log.d("succes", msg)
+                            logInfo("add contact")
                         }
 
                         override fun onFailure(call: Call<Unit>, t: Throwable) {
                             val msg = "error when subscribing: ${t.localizedMessage}"
-                            Log.d("error", msg)
-
+                            logInfo("error add contact $t")
                             onErrorCallback(msg)
-
                         }
                     })
                 } else {
-                    Log.d("Internet", "Интернет отсутствует")
+                    logInfo("error add contact no Internet")
                 }
             }
         }
     }
 
-    fun UpdateContacts(email: String, phone: String) {
+    fun updateContacts (email: String, phone: String) {
         val params = hashMapOf<String, String>()
         if (email.isNotEmpty()) {
             params.put("email", email)
@@ -505,14 +509,14 @@ object EnkodPushLibrary {
             }
 
             override fun onFailure(call: Call<Unit>, t: Throwable) {
-
                 onErrorCallback("Error when updating: ${t.localizedMessage}")
+                logInfo("error updatingContact $t")
             }
         })
         return
     }
 
-    fun isOnlineStatus (status: Boolean) {
+    fun isOnlineStatus(status: Boolean) {
         isOnline = status
     }
 
@@ -520,17 +524,16 @@ object EnkodPushLibrary {
         val connectivityManager =
             context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         if (connectivityManager != null) {
+
             val capabilities =
                 connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
             if (capabilities != null) {
+
                 if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
-                    Log.i("Internet", "NetworkCapabilities.TRANSPORT_CELLULAR")
                     return true
                 } else if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
-                    Log.i("Internet", "NetworkCapabilities.TRANSPORT_WIFI")
                     return true
                 } else if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
-                    Log.i("Internet", "NetworkCapabilities.TRANSPORT_ETHERNET")
                     return true
                 }
             }
@@ -538,13 +541,24 @@ object EnkodPushLibrary {
         return false
     }
 
+    fun dev(context: Context): String? {
 
+        val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
+        var preferencesBaseUrl: String?
+
+        preferencesBaseUrl = when (preferences) {
+
+            null -> null
+            else -> preferences.getString(DEV_TAG, null)
+        }
+
+        return preferencesBaseUrl
+    }
 
     private fun getClientName(): String {
         Log.d("Library", "getClientName ${this.account}")
         return this.account!!
     }
-
 
     private fun getSession(): String {
 
@@ -558,7 +572,6 @@ object EnkodPushLibrary {
     fun getSessionFromLibrary(context: Context): String {
         val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
         val preferencesSessionId = preferences.getString(SESSION_ID_TAG, null)
-        Log.d("prefstring", preferencesSessionId.toString())
         return if (!preferencesSessionId.isNullOrEmpty()) {
             preferencesSessionId!!
         } else ""
@@ -581,11 +594,12 @@ object EnkodPushLibrary {
         preferences.edit().remove(WORKER_TAG).apply()
         preferences.edit().remove(START_TIMER_TAG).apply()
         preferences.edit().remove(TIME_TAG).apply()
+        preferences.edit().remove(DEV_TAG).apply()
 
         sessionId = ""
         token = ""
+
         WorkManager.getInstance(context).cancelUniqueWork("refreshInMemoryWorker")
-        WorkManager.getInstance(context).cancelUniqueWork("refreshToken")
         WorkManager.getInstance(context).cancelUniqueWork("verificationOfTokenWorker")
 
         initLibObserver.value = false
@@ -629,15 +643,11 @@ object EnkodPushLibrary {
     }
 
 
-
     fun createNotification(context: Context, message: RemoteMessage, image: Bitmap?) {
-
 
         with(message.data) {
 
             val data = message.data
-
-            Log.d("message", data.toString())
 
             var url = ""
 
@@ -645,13 +655,7 @@ object EnkodPushLibrary {
                 url = data["url"].toString()
             }
 
-            for (key in keys) {
-                //message.data[key]
-                Log.d("message_tag", key.toString())
-            }
-
-            val builder = NotificationCompat.Builder(context, CHANEL_Id)
-
+            val builder = NotificationCompat.Builder(context, chanelEnkod)
 
             val pendingIntent: PendingIntent = getIntent(
                 context, message.data, "", url
@@ -660,20 +664,18 @@ object EnkodPushLibrary {
             builder
 
                 .setIcon(context, data["imageUrl"])
-                //.setColor(context, data["color"])
                 .setLights(
-                    get(variables.ledColor), get(variables.ledOnMs), get(variables.ledOffMs)
+                    get(ledColor), get(ledOnMs), get(ledOffMs)
                 )
-                .setVibrate(get(variables.vibrationOn).toBoolean())
-                .setSound(get(variables.soundOn).toBoolean())
-                .setContentTitle(data["title"])
-                .setContentText(data["body"])
+                .setVibrate(get(vibrationOn).toBoolean())
+                .setSound(get(soundOn).toBoolean())
+                .setContentTitle(data[title])
+                .setContentText(data[body])
                 .setColor(Color.BLACK)
                 .setContentIntent(pendingIntent)
                 .setAutoCancel(true)
                 .addActions(context, message.data)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
-
 
 
             if (image != null) {
@@ -690,10 +692,9 @@ object EnkodPushLibrary {
                         )
                 } catch (e: Exception) {
 
-
+                    logInfo("error push img builder" )
                 }
             }
-
 
             with(NotificationManagerCompat.from(context)) {
                 if (ActivityCompat.checkSelfPermission(
@@ -705,7 +706,7 @@ object EnkodPushLibrary {
                     return
                 }
 
-                notify(message.data["messageId"]!!.toInt(), builder.build())
+                notify(message.data[messageId]!!.toInt(), builder.build())
 
                 exit = 1
 
@@ -719,13 +720,13 @@ object EnkodPushLibrary {
 
     }
 
-    fun createdService () {
+    fun createdService() {
 
         serviceCreated = true
 
     }
 
-    fun createdServiceNotification (context: Context, message: RemoteMessage) {
+    fun createdServiceNotification(context: Context, message: RemoteMessage) {
 
         var observer = true
 
@@ -736,7 +737,6 @@ object EnkodPushLibrary {
 
                 if (serviceCreated) {
                     delay(3000)
-                    Log.d("service_state", "push")
                     downloadImageToPush(context, message)
                     observer = false
                 }
@@ -749,9 +749,8 @@ object EnkodPushLibrary {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val name = "Notification Title"
             val descriptionText = "Notification Description"
-            //val importance = NotificationManager.IMPORTANCE_MAX
             val channel = NotificationChannel(
-                CHANEL_Id,
+                chanelEnkod,
                 name,
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
@@ -765,11 +764,14 @@ object EnkodPushLibrary {
 
     fun downloadImageToPush(context: Context, message: RemoteMessage) {
 
-        val userAgent = System.getProperty("http.agent")
+        val userAgent = when (val agent: String? = System.getProperty("http.agent")) {
+            null -> "android"
+            else -> agent
+        }
 
         val url = GlideUrl(
 
-            message.data["image"], LazyHeaders.Builder()
+            message.data[messageId], LazyHeaders.Builder()
                 .addHeader(
                     "User-Agent",
                     userAgent
@@ -794,14 +796,14 @@ object EnkodPushLibrary {
 
                 override fun onError(e: Throwable) {
 
-                    Log.d("onError", e.message.toString())
                     processMessage(context, message, null)
 
                 }
 
                 override fun onNext(t: Bitmap?) {
+
                     processMessage(context, message, t!!)
-                    Log.d("onNext", t.toString())
+
                     exitSelf()
                 }
             })
@@ -814,7 +816,6 @@ object EnkodPushLibrary {
         url: String
     ): PendingIntent {
 
-        Log.d("message_info", "${data["intent"].toString()} ${field.toString()}")
         val intent =
             if (field == "1") {
                 getOpenUrlIntent(context, data, url)
@@ -830,7 +831,7 @@ object EnkodPushLibrary {
             }
 
         intent!!.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        intent.putExtra(variables.personId, data[variables.personId])
+        intent.putExtra(personId, data[personId])
 
         return PendingIntent.getActivity(
             context,
@@ -841,7 +842,7 @@ object EnkodPushLibrary {
     }
 
     internal fun getOpenAppIntent(context: Context): Intent {
-        Log.d("Library", "getOpenAppIntent")
+
         return Intent(context, OnOpenActivity::class.java).also {
             it.putExtras(
                 bundleOf(
@@ -852,10 +853,8 @@ object EnkodPushLibrary {
         }
     }
 
-    // функция (getPackageLauncherIntent) создает намерение которое открывает приложение при нажатии на push
     internal fun getPackageLauncherIntent(context: Context): Intent? {
 
-        Log.d("package_intent", "getPackageLauncherIntent")
         val pm: PackageManager = context.packageManager
         return pm.getLaunchIntentForPackage(context.packageName).also {
             val bundle = (
@@ -898,7 +897,7 @@ object EnkodPushLibrary {
 
 
     private fun getOpenUrlIntent(context: Context, data: Map<String, String>, URL: String): Intent {
-        Log.d("Library", "getOpenUrlIntent")
+
         if (URL != "null") {
             return Intent(context, OnOpenActivity::class.java).also {
                 it.putExtras(
@@ -928,7 +927,7 @@ object EnkodPushLibrary {
 
 
     private fun setClientName(context: Context, acc: String) {
-        Log.d("Library", "setClientName ${acc.toString()}")
+
         val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
         preferences
             .edit()
@@ -945,7 +944,7 @@ object EnkodPushLibrary {
         resName: String?,
         pPackageName: String?
     ): Int {
-        Log.d("Library", "getResourceId")
+
         return try {
             context.resources.getIdentifier(pVariableName, resName, pPackageName)
         } catch (e: Exception) {
@@ -956,12 +955,11 @@ object EnkodPushLibrary {
 
 
     internal fun onDeletedMessage() {
-        Log.d("Library", "onDeletedMessage")
+
         onDeletedMessage.invoke()
     }
 
     internal fun set(hasVibration: Boolean): LongArray {
-        Log.d("Library", "set_vibrationPattern")
         return if (hasVibration) {
             vibrationPattern
         } else {
@@ -971,7 +969,6 @@ object EnkodPushLibrary {
 
     fun handleExtras(context: Context, extras: Bundle) {
         val link = extras.getString(url)
-        Log.d("handleExtras", "handleExtras ${extras.getString("messageId")}")
         sendPushClickInfo(extras, context)
         when (OpenIntent.get(extras.getString(intentName))) {
             OpenIntent.OPEN_URL -> {
@@ -1001,9 +998,6 @@ object EnkodPushLibrary {
 
     private fun sendPushClickInfo(extras: Bundle, context: Context) {
 
-        Log.d("intent_lvl", "sendPushClickInfo")
-
-
         val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
 
         var preferencesAcc = preferences.getString(ACCOUNT_TAG, null)
@@ -1032,12 +1026,7 @@ object EnkodPushLibrary {
             else -> sessionID = preferencesSessionId
         }
 
-
-        initRetrofit()
-
-
-        Log.d("sendPushClickInfo", "$sessionID, ${personID}, ${messageID}, ${intent}, $url")
-
+        initRetrofit(context)
 
         retrofit.pushClick(
             getClientName(),
@@ -1058,17 +1047,13 @@ object EnkodPushLibrary {
                 response: Response<PushClickBody>
             ) {
                 val msg = "succsess"
-
                 response.code()
-                Log.d("sendPushClickInfo", response.code().toString())
-
                 onPushClickCallback(extras, msg)
             }
 
             override fun onFailure(call: Call<PushClickBody>, t: Throwable) {
 
                 val msg = "failure"
-                Log.d("sendPushClickInfo", "failure $t")
                 logInfo(msg)
                 onPushClickCallback(extras, msg)
 
@@ -1078,8 +1063,6 @@ object EnkodPushLibrary {
     }
 
 
-
-    // функция (RemoveFromFavourite) фиксирует событые добавления в корзину
     fun addToCart(product: Product) {
 
         initLibObserver.observable.subscribe {
@@ -1148,7 +1131,6 @@ object EnkodPushLibrary {
         }
     }
 
-    // функция (RemoveFromFavourite) фиксирует событые удаления из корзины
     fun removeFromCart(product: Product) {
 
         initLibObserver.observable.subscribe {
@@ -1216,7 +1198,6 @@ object EnkodPushLibrary {
         }
     }
 
-    // функция (RemoveFromFavourite) фиксирует событые добавления из избранное
     fun addToFavourite(product: Product) {
 
         initLibObserver.observable.subscribe {
@@ -1248,6 +1229,7 @@ object EnkodPushLibrary {
                         add(property, JsonObject()
                             .apply {
                                 addProperty("lastUpdate", System.currentTimeMillis())
+
                                 add("products", JsonArray().apply { add(products) })
                             })
                         add("history", JsonArray().apply { add(history) })
@@ -1285,8 +1267,6 @@ object EnkodPushLibrary {
             }
         }
     }
-
-// функция (RemoveFromFavourite) фиксирует событые удаления из избранного
 
     fun removeFromFavourite(product: Product) {
 
@@ -1356,8 +1336,6 @@ object EnkodPushLibrary {
     }
 
 
-// функция (productBuy) для передачи информации о покупках на сервис
-
     fun productBuy(order: Order) {
 
         initLibObserver.observable.subscribe {
@@ -1410,7 +1388,7 @@ object EnkodPushLibrary {
                     override fun onResponse(call: Call<Unit>, response: Response<Unit>) {
                         val msg = "buying ok"
                         logInfo(msg)
-                        //ClearCart()
+
                         onProductActionCallback(msg)
                     }
 
@@ -1425,7 +1403,6 @@ object EnkodPushLibrary {
         }
     }
 
-// функция (ProductOpen) для передаци информации об открытии товаров на сервис
 
     fun productOpen(product: Product) {
         initLibObserver.observable.subscribe {

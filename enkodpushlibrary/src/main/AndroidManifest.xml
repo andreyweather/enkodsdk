@@ -24,15 +24,6 @@
             />
 
         <service
-            android:name="com.enkod.enkodpushlibrary.VerificationTokenService"
-            android:enabled="true"
-            android:exported="false"
-            android:usesCleartextTraffic="true"
-            android:foregroundServiceType = "dataSync"
-            android:directBootAware = "true"
-            />
-
-        <service
             android:name="com.enkod.enkodpushlibrary.UpdateTokenService"
             android:enabled="true"
             android:exported="false"
