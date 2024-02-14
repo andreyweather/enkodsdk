@@ -94,7 +94,7 @@ object EnkodPushLibrary {
     internal var url: String = "url"
 
     internal val vibrationPattern = longArrayOf(1500, 500)
-    internal val defaultIconId: Int = R.drawable.ic_launcher_background
+    internal val defaultIconId: Int = R.drawable.ic_launcher_foreground
 
     private val initLibObserver = InitLibObserver(false)
     private var onPushClickCallback: (Bundle, String) -> Unit = { _, _ -> }
