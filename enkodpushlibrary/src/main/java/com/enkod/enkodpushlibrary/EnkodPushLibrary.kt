@@ -522,17 +522,17 @@ object EnkodPushLibrary {
         return false
     }
 
-    fun dev(context: Context): String? {
-
+    fun devMode (context: Context, url: String) {
         val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
+        preferences.edit()
+            .putString(DEV_TAG, url)
+            .apply()
+    }
 
-        val preferencesBaseUrl = when (val preferencesDev = preferences.getString(DEV_TAG, null)) {
-
-            null -> null
-            else -> preferencesDev
-        }
-
-        return preferencesBaseUrl
+    private fun dev (context: Context): String? {
+        val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
+        val devUrl = preferences.getString(DEV_TAG, null)
+        return devUrl
     }
 
     private fun getClientName(): String {
@@ -602,7 +602,7 @@ object EnkodPushLibrary {
 
 
     internal fun logInfo(msg: String) {
-        Log.d("Library", "logInfo + ${msg}")
+        Log.d("enkodLibrary", "logInfo + ${msg}")
         Log.i(TAG, msg)
     }
 
@@ -1057,14 +1057,14 @@ object EnkodPushLibrary {
                 call: Call<PushClickBody>,
                 response: Response<PushClickBody>
             ) {
-                val msg = "succsess"
+                val msg = "sendPushClickInfo succsess"
                 response.code()
                 onPushClickCallback(extras, msg)
             }
 
             override fun onFailure(call: Call<PushClickBody>, t: Throwable) {
 
-                val msg = "failure"
+                val msg = "sendPushClickInfo failure $t"
                 logInfo(msg)
                 onPushClickCallback(extras, msg)
 
@@ -1089,7 +1089,7 @@ object EnkodPushLibrary {
             }
 
             override fun onFailure(call: Call<Unit>, t: Throwable) {
-                val msg = "error when saving page open: ${t.localizedMessage}"
+                val msg = "PageOpen error: ${t.localizedMessage}"
                 logInfo(msg)
                 onProductActionCallback(msg)
                 onErrorCallback(msg)
@@ -1191,14 +1191,14 @@ fun createHistoryJsonForCartAndFavourite (product: Product): JsonObject {
                             call: Call<Unit>,
                             response: Response<Unit>
                         ) {
-                            val msg = "success"
+                            val msg = "addToCart success"
                             logInfo(msg)
                             onProductActionCallback(msg)
 
                         }
 
                         override fun onFailure(call: Call<Unit>, t: Throwable) {
-                            val msg = "error when adding product to cart: ${t.localizedMessage}"
+                            val msg = "addToCart error: ${t.localizedMessage}"
                             logInfo(msg)
                             onProductActionCallback(msg)
                             onErrorCallback(msg)
@@ -1247,14 +1247,14 @@ fun createHistoryJsonForCartAndFavourite (product: Product): JsonObject {
                             call: Call<Unit>,
                             response: Response<Unit>
                         ) {
-                            val msg = "success"
+                            val msg = "removeFromCart success"
                             logInfo(msg)
                             onProductActionCallback(msg)
 
                         }
 
                         override fun onFailure(call: Call<Unit>, t: Throwable) {
-                            val msg = "error when adding product to cart: ${t.localizedMessage}"
+                            val msg = "removeFromCart error:  ${t.localizedMessage}"
                             logInfo(msg)
                             onProductActionCallback(msg)
                             onErrorCallback(msg)
@@ -1305,16 +1305,15 @@ fun createHistoryJsonForCartAndFavourite (product: Product): JsonObject {
                             call: Call<Unit>,
                             response: Response<Unit>
                         ) {
-                            Log.d("Favourite", "success")
-                            val msg = "success"
+                            val msg = "addToFavourite success"
                             logInfo(msg)
                             onProductActionCallback(msg)
 
                         }
 
                         override fun onFailure(call: Call<Unit>, t: Throwable) {
-                            Log.d("Favourite", "${t.localizedMessage}")
-                            val msg = "error when adding product to cart: ${t.localizedMessage}"
+
+                            val msg = "addToFavourite error: ${t.localizedMessage}"
                             logInfo(msg)
                             onProductActionCallback(msg)
                             onErrorCallback(msg)
@@ -1366,14 +1365,14 @@ fun createHistoryJsonForCartAndFavourite (product: Product): JsonObject {
                             call: Call<Unit>,
                             response: Response<Unit>
                         ) {
-                            val msg = "success"
+                            val msg = "removeFromFavourite success"
                             logInfo(msg)
                             onProductActionCallback(msg)
 
                         }
 
                         override fun onFailure(call: Call<Unit>, t: Throwable) {
-                            val msg = "error when adding product to cart: ${t.localizedMessage}"
+                            val msg = "removeFromFavourite error: ${t.localizedMessage}"
                             logInfo(msg)
                             onProductActionCallback(msg)
                             onErrorCallback(msg)
@@ -1459,14 +1458,14 @@ fun createHistoryJsonForCartAndFavourite (product: Product): JsonObject {
                     req
                 ).enqueue(object : Callback<Unit> {
                     override fun onResponse(call: Call<Unit>, response: Response<Unit>) {
-                        val msg = "buying ok"
+                        val msg = "productBuy success"
                         logInfo(msg)
 
                         onProductActionCallback(msg)
                     }
 
                     override fun onFailure(call: Call<Unit>, t: Throwable) {
-                        val msg = "error when buying: ${t.localizedMessage}"
+                        val msg = "productBuy error: ${t.localizedMessage}"
                         logInfo(msg)
                         onProductActionCallback(msg)
                         onErrorCallback(msg)
@@ -1515,7 +1514,7 @@ fun createHistoryJsonForCartAndFavourite (product: Product): JsonObject {
                         }
 
                         override fun onFailure(call: Call<Unit>, t: Throwable) {
-                            val msg = "error when saving product open: ${t.localizedMessage}"
+                            val msg = "productOpen error: ${t.localizedMessage}"
                             logInfo(msg)
                             onProductActionCallback(msg)
                             onErrorCallback(msg)

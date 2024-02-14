@@ -6,7 +6,7 @@ data class Product(
     var count: Int?,
     var price: String?,
     var picture: String?,
-    var params: Map <String, Any>?
+    var params: Map <String, Any>? = null
 )
 
 data class Order(
@@ -16,7 +16,7 @@ data class Order(
     var price: String?,
     var picture: String?,
     var sum: Double?,
-    var params: Map <String, Any>?
+    var params: Map <String, Any>? = null
 )
 
 data class PageUrl(
