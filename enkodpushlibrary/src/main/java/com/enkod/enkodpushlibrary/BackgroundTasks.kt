@@ -12,6 +12,7 @@ import androidx.work.Worker
 import androidx.work.WorkerParameters
 import com.enkod.enkodpushlibrary.Preferences.TAG
 import com.enkod.enkodpushlibrary.Preferences.WORKER_TAG
+import com.enkod.enkodpushlibrary.Variables.start
 import com.google.android.gms.tasks.OnCompleteListener
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.CoroutineScope
@@ -36,11 +37,10 @@ class BackgroundTasks(_context: Context) {
     val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
 
 
-    fun refreshInMemoryWorker(timeUpdate: Long) {
-
+    fun refreshInMemoryWorker(timeUpdate: Int) {
 
         val workRequest =
-            PeriodicWorkRequestBuilder<RefreshAppInMemoryWorkManager>(timeUpdate, TimeUnit.HOURS)
+            PeriodicWorkRequestBuilder<RefreshAppInMemoryWorkManager>(timeUpdate.toLong(), TimeUnit.HOURS)
                 .build()
 
         WorkManager
@@ -53,7 +53,8 @@ class BackgroundTasks(_context: Context) {
             )
 
         preferences.edit()
-            .putString(WORKER_TAG, "start")
+
+            .putString(WORKER_TAG, start)
             .apply()
 
     }
@@ -76,9 +77,8 @@ class BackgroundTasks(_context: Context) {
                     )
                 )
 
-
-
                 return Result.success()
+
             } catch (e: Exception) {
 
                 return Result.failure();
@@ -87,7 +87,7 @@ class BackgroundTasks(_context: Context) {
     }
 
 
-    class verificationOfTokenWorkManager(
+    class verificationOfTokenWorkManager (
         context: Context,
         workerParameters: WorkerParameters
     ) :
@@ -147,8 +147,12 @@ class BackgroundTasks(_context: Context) {
 
     fun verificationOfTokenWorker(context: Context) {
 
+        val preferencesTimeVerification: Int?  = preferences.getInt(Preferences.START_TIMER_TAG, 1)
+
+        val time = preferencesTimeVerification ?: 1
+
         val workRequest =
-            PeriodicWorkRequestBuilder<verificationOfTokenWorkManager>(1, TimeUnit.HOURS)
+            PeriodicWorkRequestBuilder<verificationOfTokenWorkManager>(time.toLong(), TimeUnit.HOURS)
                 .build()
 
         WorkManager
@@ -170,9 +174,12 @@ internal fun verificationOfTokenCompliance(
     currentToken: String?
 ) {
 
+    val account = account ?: ""
+    val session = session ?: ""
+
     EnkodPushLibrary.retrofit.getToken(
-        account!!,
-        session!!
+        account,
+        session
     ).enqueue(object : Callback<GetTokenResponse> {
 
         override fun onResponse(
@@ -194,6 +201,7 @@ internal fun verificationOfTokenCompliance(
                     if (tokenOnService == currentToken) {
 
                         WorkManager.getInstance(context)
+
                             .cancelUniqueWork("verificationOfTokenWorker")
 
                         EnkodPushLibrary.logInfo("token verification true")

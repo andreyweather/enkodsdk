@@ -24,9 +24,12 @@ class UpdateTokenService : Service() {
         super.onCreate()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(1, EnkodPushLibrary.createdNotificationForNetworkService(this), ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-        }
-        else {
+            startForeground(
+                1,
+                EnkodPushLibrary.createdNotificationForNetworkService(this),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            )
+        } else {
             startForeground(1, EnkodPushLibrary.createdNotificationForNetworkService(this))
         }
 
@@ -39,6 +42,7 @@ class UpdateTokenService : Service() {
 
 
             val preferences = applicationContext.getSharedPreferences(TAG, Context.MODE_PRIVATE)
+
             var preferencesAcc = preferences.getString(ACCOUNT_TAG, null)
 
             if (preferencesAcc != null) {
@@ -61,11 +65,13 @@ class UpdateTokenService : Service() {
 
                                         EnkodPushLibrary.init(
                                             applicationContext,
-                                            preferencesAcc!!,
+                                            preferencesAcc,
                                             token
                                         )
 
-                                        BackgroundTasks(applicationContext).verificationOfTokenWorker(applicationContext)
+                                        BackgroundTasks(applicationContext).verificationOfTokenWorker(
+                                            applicationContext
+                                        )
 
                                         CoroutineScope(Dispatchers.IO).launch {
 

@@ -17,5 +17,10 @@ object Variables {
     internal var ledColor = "led"
     internal var exitStatusN = "noexit"
     internal var exitStatusE = "exit"
+    internal var start = "start"
+    internal var defaultTimeUpdateToken = 336
+    internal var defaultTimeVerificationToken = 1
+    internal var defaultTimeRefreshAppInMemory = 12
+    internal var millisInHours = 3600000
 
 }

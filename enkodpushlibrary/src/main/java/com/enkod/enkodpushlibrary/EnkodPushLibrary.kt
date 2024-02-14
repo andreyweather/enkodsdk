@@ -34,6 +34,7 @@ import com.enkod.enkodpushlibrary.Preferences.SESSION_ID_TAG
 import com.enkod.enkodpushlibrary.Preferences.START_TIMER_TAG
 import com.enkod.enkodpushlibrary.Preferences.TAG
 import com.enkod.enkodpushlibrary.Preferences.TIME_TAG
+import com.enkod.enkodpushlibrary.Preferences.TIME_VERIFICATION_TAG
 import com.enkod.enkodpushlibrary.Preferences.TOKEN_TAG
 import com.enkod.enkodpushlibrary.Preferences.WORKER_TAG
 import com.enkod.enkodpushlibrary.Variables.body
@@ -77,7 +78,7 @@ import java.util.concurrent.TimeUnit
 object EnkodPushLibrary {
 
     private const val baseUrl = "https://ext.enkod.ru/"
-    internal val chanelEnkod = "enkod_lib_1"
+    internal const val chanelEnkod = "enkod_lib_1"
 
     internal var exit = 0
     internal var exitSelf = 0
@@ -106,100 +107,6 @@ object EnkodPushLibrary {
 
     internal lateinit var retrofit: Api
     private lateinit var client: OkHttpClient
-
-
-    class NullOnEmptyConverterFactory : Converter.Factory() {
-        override fun responseBodyConverter(
-            type: Type,
-            annotations: Array<Annotation>,
-            retrofit: Retrofit
-        ): Converter<ResponseBody, *> {
-
-            val delegate: Converter<ResponseBody, *> =
-                retrofit.nextResponseBodyConverter<Any>(this, type, annotations)
-            return Converter { body ->
-                if (body.contentLength() == 0L) null else delegate.convert(
-                    body
-                )
-            }
-        }
-    }
-
-
-    enum class OpenIntent {
-        DYNAMIC_LINK, OPEN_URL, OPEN_APP;
-
-        fun get(): String {
-
-            return when (this) {
-                DYNAMIC_LINK -> "0"
-                OPEN_URL -> "1"
-                OPEN_APP -> "2"
-
-            }
-        }
-
-        companion object {
-            fun get(intent: String?): OpenIntent {
-
-                return when (intent) {
-                    "0" -> DYNAMIC_LINK
-                    "1" -> OPEN_URL
-                    "2" -> OPEN_APP
-                    else -> OPEN_APP
-                }
-            }
-        }
-    }
-
-    internal fun initPreferences(context: Context) {
-
-        val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
-
-        var preferencesAcc = preferences.getString(ACCOUNT_TAG, null)
-        var preferencesSessionId = preferences.getString(SESSION_ID_TAG, null)
-        var preferencesToken = preferences.getString(TOKEN_TAG, null)
-
-
-        this.sessionId = preferencesSessionId
-        this.token = preferencesToken
-        this.account = preferencesAcc
-
-    }
-
-
-    internal fun initRetrofit(context: Context) {
-
-        client = OkHttpClient.Builder()
-            .callTimeout(60L, TimeUnit.SECONDS)
-            .connectTimeout(60L, TimeUnit.SECONDS)
-            .readTimeout(60L, TimeUnit.SECONDS)
-            .writeTimeout(60L, TimeUnit.SECONDS)
-            .addInterceptor(
-                HttpLoggingInterceptor().apply {
-                    level = HttpLoggingInterceptor.Level.BODY
-
-                }
-            )
-            .build()
-
-        var urlRetrofit = ""
-
-        urlRetrofit = when (dev(context)) {
-
-            null -> baseUrl
-            else -> dev(context)!!
-        }
-
-        retrofit = Retrofit.Builder()
-            .baseUrl(urlRetrofit)
-            .addConverterFactory(NullOnEmptyConverterFactory())
-            .addConverterFactory(GsonConverterFactory.create())
-            .client(client)
-            .build()
-            .create(Api::class.java)
-
-    }
 
 
     internal fun init(context: Context, account: String, token: String? = null) {
@@ -248,6 +155,82 @@ object EnkodPushLibrary {
         }
     }
 
+    private fun setClientName(context: Context, acc: String) {
+
+        val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
+        preferences
+            .edit()
+            .putString(ACCOUNT_TAG, acc)
+            .apply()
+
+        this.account = acc
+    }
+
+    internal fun initPreferences(context: Context) {
+
+        val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
+
+        val preferencesAcc = preferences.getString(ACCOUNT_TAG, null)
+        val preferencesSessionId = preferences.getString(SESSION_ID_TAG, null)
+        val preferencesToken = preferences.getString(TOKEN_TAG, null)
+
+
+        this.sessionId = preferencesSessionId
+        this.token = preferencesToken
+        this.account = preferencesAcc
+
+    }
+
+    class NullOnEmptyConverterFactory : Converter.Factory() {
+        override fun responseBodyConverter(
+            type: Type,
+            annotations: Array<Annotation>,
+            retrofit: Retrofit
+        ): Converter<ResponseBody, *> {
+
+            val delegate: Converter<ResponseBody, *> =
+                retrofit.nextResponseBodyConverter<Any>(this, type, annotations)
+            return Converter { body ->
+                if (body.contentLength() == 0L) null else delegate.convert(
+                    body
+                )
+            }
+        }
+    }
+
+
+    internal fun initRetrofit(context: Context) {
+
+        client = OkHttpClient.Builder()
+            .callTimeout(60L, TimeUnit.SECONDS)
+            .connectTimeout(60L, TimeUnit.SECONDS)
+            .readTimeout(60L, TimeUnit.SECONDS)
+            .writeTimeout(60L, TimeUnit.SECONDS)
+            .addInterceptor(
+                HttpLoggingInterceptor().apply {
+                    level = HttpLoggingInterceptor.Level.BODY
+
+                }
+            )
+            .build()
+
+        val urlRetrofit = when (dev(context)) {
+
+            null -> baseUrl
+            else -> dev(context)!!
+        }
+
+        retrofit = Retrofit.Builder()
+            .baseUrl(urlRetrofit)
+            .addConverterFactory(NullOnEmptyConverterFactory())
+            .addConverterFactory(GsonConverterFactory.create())
+            .client(client)
+            .build()
+            .create(Api::class.java)
+
+    }
+
+
     private fun getSessionIdFromApi(context: Context) {
 
         retrofit.getSessionId(getClientName()).enqueue(object : Callback<SessionIdResponse> {
@@ -285,41 +268,43 @@ object EnkodPushLibrary {
                     null -> return
                     else ->  Toast.makeText(context, "error: ${t.message}", Toast.LENGTH_LONG).show()
                 }
-
             }
         })
     }
 
 
-    private fun newSessions(ctx: Context, nsession: String?) {
+    private fun newSessions(ctx: Context, session: String?) {
 
         val preferences = ctx.getSharedPreferences(TAG, Context.MODE_PRIVATE)
 
-        var newPreferencesToken = preferences.getString(TOKEN_TAG, null)
+        val newPreferencesToken = preferences.getString(TOKEN_TAG, null)
 
         preferences.edit()
-            .putString(SESSION_ID_TAG, nsession)
+            .putString(SESSION_ID_TAG, session)
             .apply()
 
-        this.sessionId = nsession
+        this.sessionId = session
 
         if (newPreferencesToken.isNullOrEmpty()) {
 
             subscribeToPush(getClientName(), getSession(), token)
 
-        } else updateToken(nsession, newPreferencesToken)
+        } else updateToken(session, newPreferencesToken)
 
     }
 
 
     private fun updateToken(session: String?, token: String?) {
 
+        val session = session ?: ""
+        val token = token ?: ""
+
         retrofit.updateToken(
             getClientName(),
             getSession(),
             SubscribeBody(
-                sessionId = session!!,
-                token = token!!
+                sessionId = session,
+                token = token
             )
         ).enqueue(object : Callback<UpdateTokenResponse> {
             override fun onResponse(
@@ -327,7 +312,7 @@ object EnkodPushLibrary {
                 response: Response<UpdateTokenResponse>
             ) {
                 logInfo("token updated")
-                newTokenCallback(token!!)
+                newTokenCallback(token)
                 startSession()
             }
 
@@ -339,6 +324,7 @@ object EnkodPushLibrary {
     }
 
     private fun startSession() {
+
         var tokenSession = ""
         if (!this.token.isNullOrEmpty()) {
             tokenSession = this.token!!
@@ -370,22 +356,16 @@ object EnkodPushLibrary {
 
     private fun subscribeToPush(client: String?, session: String?, token: String?) {
 
-        var c = ""
-        var client: String? = if (client != null) client else c
-
-        var s = ""
-        var session: String? = if (session != null) session else s
-
-        var t = ""
-        var token: String? = if (token != null) token else t
-
+        val client = client ?: ""
+        val session = session ?: ""
+        val token = token ?: ""
 
         retrofit.subscribeToPushToken(
-            client!!,
-            session!!,
+            client,
+            session,
             SubscribeBody(
-                sessionId = session!!,
-                token = token!!,
+                sessionId = session,
+                token = token,
                 os = "android"
             )
         ).enqueue(object : Callback<UpdateTokenResponse> {
@@ -414,7 +394,7 @@ object EnkodPushLibrary {
         phone: String = "",
         source: String = "mobile",
 
-        extrafileds: Map<String, String>? = null
+        params: Map<String, String>? = null
 
     ) {
 
@@ -438,14 +418,15 @@ object EnkodPushLibrary {
                     val fileds = JsonObject()
 
 
-                    if (!extrafileds.isNullOrEmpty()) {
-                        val keys = extrafileds.keys
+                    if (!params.isNullOrEmpty()) {
 
-                        for (i in 0 until keys.size) {
+                        val keys = params.keys
+
+                        for (i in keys.indices) {
 
                             fileds.addProperty(
                                 keys.elementAt(i),
-                                extrafileds.getValue(keys.elementAt(i))
+                                params.getValue(keys.elementAt(i))
                             )
                         }
                     }
@@ -523,8 +504,8 @@ object EnkodPushLibrary {
     fun isOnline(context: Context): Boolean {
         val connectivityManager =
             context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        if (connectivityManager != null) {
 
+        if (connectivityManager != null) {
             val capabilities =
                 connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
             if (capabilities != null) {
@@ -544,36 +525,42 @@ object EnkodPushLibrary {
     fun dev(context: Context): String? {
 
         val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
-        var preferencesBaseUrl: String?
 
-        preferencesBaseUrl = when (preferences) {
+        val preferencesBaseUrl = when (val preferencesDev = preferences.getString(DEV_TAG, null)) {
 
             null -> null
-            else -> preferences.getString(DEV_TAG, null)
+            else -> preferencesDev
         }
 
         return preferencesBaseUrl
     }
 
     private fun getClientName(): String {
-        Log.d("Library", "getClientName ${this.account}")
-        return this.account!!
+
+        return if (!this.account.isNullOrEmpty()) {
+            this.account!!
+        } else ""
     }
 
     private fun getSession(): String {
 
         return if (!this.sessionId.isNullOrEmpty()) {
-            Log.d("getSession", " $sessionId")
             this.sessionId!!
         } else ""
+    }
 
+    private fun getToken(): String {
+
+        return if (!this.token.isNullOrEmpty()) {
+            this.token!!
+        } else ""
     }
 
     fun getSessionFromLibrary(context: Context): String {
         val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
         val preferencesSessionId = preferences.getString(SESSION_ID_TAG, null)
         return if (!preferencesSessionId.isNullOrEmpty()) {
-            preferencesSessionId!!
+            preferencesSessionId
         } else ""
     }
 
@@ -581,23 +568,30 @@ object EnkodPushLibrary {
         val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
         val preferencesToken = preferences.getString(TOKEN_TAG, null)
         return if (!preferencesToken.isNullOrEmpty()) {
-            preferencesToken!!
+            preferencesToken
         } else ""
     }
 
 
     fun logOut(context: Context) {
-        FirebaseMessaging.getInstance().deleteToken();
+
+        FirebaseMessaging.getInstance().deleteToken()
+
         val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
+
         preferences.edit().remove(SESSION_ID_TAG).apply()
+        sessionId = ""
+        preferences.edit().remove(ACCOUNT_TAG).apply()
+        account = ""
         preferences.edit().remove(TOKEN_TAG).apply()
+        token = ""
+
         preferences.edit().remove(WORKER_TAG).apply()
         preferences.edit().remove(START_TIMER_TAG).apply()
         preferences.edit().remove(TIME_TAG).apply()
+        preferences.edit().remove(TIME_VERIFICATION_TAG).apply()
         preferences.edit().remove(DEV_TAG).apply()
 
-        sessionId = ""
-        token = ""
 
         WorkManager.getInstance(context).cancelUniqueWork("refreshInMemoryWorker")
         WorkManager.getInstance(context).cancelUniqueWork("verificationOfTokenWorker")
@@ -830,7 +824,7 @@ object EnkodPushLibrary {
                 getOpenAppIntent(context)
             }
 
-        intent!!.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         intent.putExtra(personId, data[personId])
 
         return PendingIntent.getActivity(
@@ -840,6 +834,33 @@ object EnkodPushLibrary {
             PendingIntent.FLAG_IMMUTABLE
         )
     }
+
+    enum class OpenIntent {
+        DYNAMIC_LINK, OPEN_URL, OPEN_APP;
+
+        fun get(): String {
+
+            return when (this) {
+                DYNAMIC_LINK -> "0"
+                OPEN_URL -> "1"
+                OPEN_APP -> "2"
+
+            }
+        }
+
+        companion object {
+            fun get(intent: String?): OpenIntent {
+
+                return when (intent) {
+                    "0" -> DYNAMIC_LINK
+                    "1" -> OPEN_URL
+                    "2" -> OPEN_APP
+                    else -> OPEN_APP
+                }
+            }
+        }
+    }
+
 
     internal fun getOpenAppIntent(context: Context): Intent {
 
@@ -863,6 +884,7 @@ object EnkodPushLibrary {
                         OpenIntent.OPEN_APP.name to true
                     )
                     )
+
         }
     }
 
@@ -926,16 +948,7 @@ object EnkodPushLibrary {
     }
 
 
-    private fun setClientName(context: Context, acc: String) {
 
-        val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
-        preferences
-            .edit()
-            .putString(ACCOUNT_TAG, acc)
-            .apply()
-
-        this.account = acc
-    }
 
 
     internal fun getResourceId(
@@ -1000,30 +1013,28 @@ object EnkodPushLibrary {
 
         val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
 
-        var preferencesAcc = preferences.getString(ACCOUNT_TAG, null)
-        var preferencesSessionId = preferences.getString(SESSION_ID_TAG, null)
-        var preferencesToken = preferences.getString(TOKEN_TAG, null)
-        var preferencesMessageId = preferences.getString(MESSAGEID_TAG, null)
+        val preferencesAcc = preferences.getString(ACCOUNT_TAG, null)
+        val preferencesSessionId = preferences.getString(SESSION_ID_TAG, null)
+        val preferencesToken = preferences.getString(TOKEN_TAG, null)
+        val preferencesMessageId = preferences.getString(MESSAGEID_TAG, null)
 
-        this.sessionId = preferencesSessionId!!
-        this.token = preferencesToken!!
-        this.account = preferencesAcc!!
+        this.sessionId = preferencesSessionId ?: ""
+        this.token = preferencesToken ?: ""
+        this.account = preferencesAcc ?: ""
 
 
-        var sessionID = ""
-        var personID = extras.getString(Variables.personId, "0").toInt()
-        var messageID = -1
-        var intent = extras.getString(intentName, "2").toInt()
+        val personID = extras.getString(personId, "0").toInt()
+        val intent = extras.getString(intentName, "2").toInt()
         val url = extras.getString(url)
 
-        when (preferencesMessageId) {
-            null -> messageID = -1
-            else -> messageID = preferencesMessageId.toInt()
+        val messageID = when (preferencesMessageId) {
+            null -> -1
+            else -> preferencesMessageId.toInt()
         }
 
-        when (preferencesSessionId) {
-            null -> sessionID = ""
-            else -> sessionID = preferencesSessionId
+        val sessionID = when (preferencesSessionId) {
+            null ->  ""
+            else -> preferencesSessionId
         }
 
         initRetrofit(context)
@@ -1062,6 +1073,85 @@ object EnkodPushLibrary {
 
     }
 
+    fun PageOpen(url: String){
+        if (url.isEmpty()){
+            return
+        }
+        retrofit.pageOpen(
+            getClientName(),
+            getSession(),
+            PageUrl(url)
+        ).enqueue(object : Callback<Unit>{
+            override fun onResponse(call: Call<Unit>, response: Response<Unit>) {
+                val msg = "page opened"
+                logInfo(msg)
+                onProductActionCallback
+            }
+
+            override fun onFailure(call: Call<Unit>, t: Throwable) {
+                val msg = "error when saving page open: ${t.localizedMessage}"
+                logInfo(msg)
+                onProductActionCallback(msg)
+                onErrorCallback(msg)
+            }
+        })
+    }
+
+
+fun createHistoryJsonForCartAndFavourite (product: Product): JsonObject {
+
+        val history = JsonObject()
+
+        if (product.id != null) {
+            history.addProperty("productId", product.id!!)
+        }
+        if (product.categoryId != null) {
+            history.addProperty("categoryId", product.categoryId!!)
+        }
+        if (product.count != null) {
+            history.addProperty("count", product.count!!)
+        }
+        if (product.price != null) {
+            history.addProperty("price", product.price!!)
+        }
+        if (product.picture != null) {
+            history.addProperty("picture", product.picture!!)
+        }
+
+        if (product.params != null) {
+
+            val paramMap = product.params
+
+            for (key in paramMap!!.keys) {
+
+                val value = paramMap[key]
+
+                try {
+
+                    when (value) {
+
+                        is String -> history.addProperty(key, value)
+                        is Int -> history.addProperty(key, value)
+                        is Boolean -> history.addProperty(key, value)
+                        is Float -> history.addProperty(key, value)
+                        is Double -> history.addProperty(key, value)
+                        else -> history.addProperty(key, value.toString())
+
+                    }
+                } catch (e: Exception) {
+                    logInfo ("error createMapHistory $e")
+                }
+            }
+        }
+
+        if (history.isJsonNull) {
+            history.addProperty("", "")
+        }
+
+        return history
+    }
+
+
 
     fun addToCart(product: Product) {
 
@@ -1071,28 +1161,17 @@ object EnkodPushLibrary {
 
                 if (!product.id.isNullOrEmpty()) {
 
-                    var req = JsonObject()
                     val products = JsonObject()
-                    val history = JsonObject()
-                    var property = ""
+                    val history = createHistoryJsonForCartAndFavourite(product)
+
+                    val property = "cart"
 
                     products.addProperty("productId", product.id)
                     products.addProperty("count", product.count)
 
-                    history.addProperty("productId", product.id)
-                    history.addProperty("categoryId", product.categoryId)
-                    history.addProperty("count", product.count)
-                    history.addProperty("price", product.price)
-                    history.addProperty("picture", product.picture)
-
-
-
                     history.addProperty("action", "productAdd")
-                    property = "cart"
 
-
-
-                    req = JsonObject().apply {
+                    val req = JsonObject().apply {
                         add(property, JsonObject()
                             .apply {
                                 addProperty("lastUpdate", System.currentTimeMillis())
@@ -1102,7 +1181,6 @@ object EnkodPushLibrary {
                     }
 
                     Log.d("req", req.toString())
-
 
                     retrofit.addToCart(
                         getClientName(),
@@ -1139,27 +1217,17 @@ object EnkodPushLibrary {
 
                 if (!product.id.isNullOrEmpty()) {
 
-                    var req = JsonObject()
                     val products = JsonObject()
-                    val history = JsonObject()
-                    var property = ""
+                    val history = createHistoryJsonForCartAndFavourite(product)
+
+                    val property = "cart"
 
                     products.addProperty("productId", product.id)
                     products.addProperty("count", product.count)
 
-                    history.addProperty("productId", product.id)
-                    history.addProperty("categoryId", product.categoryId)
-                    history.addProperty("count", product.count)
-                    history.addProperty("price", product.price)
-                    history.addProperty("picture", product.picture)
-
-
-
                     history.addProperty("action", "productRemove")
-                    property = "cart"
 
-
-                    req = JsonObject().apply {
+                    val req = JsonObject().apply {
                         add(property, JsonObject()
                             .apply {
                                 addProperty("lastUpdate", System.currentTimeMillis())
@@ -1169,7 +1237,6 @@ object EnkodPushLibrary {
                     }
 
                     Log.d("req", req.toString())
-
 
                     retrofit.addToCart(
                         getClientName(),
@@ -1206,26 +1273,17 @@ object EnkodPushLibrary {
 
                 if (!product.id.isNullOrEmpty()) {
 
-                    var req = JsonObject()
                     val products = JsonObject()
-                    val history = JsonObject()
-                    var property = ""
+                    val history = createHistoryJsonForCartAndFavourite(product)
+
+                    val property = "wishlist"
 
                     products.addProperty("productId", product.id)
                     products.addProperty("count", product.count)
 
-                    history.addProperty("productId", product.id)
-                    history.addProperty("categoryId", product.categoryId)
-                    history.addProperty("count", product.count)
-                    history.addProperty("price", product.price)
-                    history.addProperty("picture", product.picture)
-
-
                     history.addProperty("action", "productLike")
-                    property = "wishlist"
 
-
-                    req = JsonObject().apply {
+                    val req = JsonObject().apply {
                         add(property, JsonObject()
                             .apply {
                                 addProperty("lastUpdate", System.currentTimeMillis())
@@ -1276,26 +1334,18 @@ object EnkodPushLibrary {
 
                 if (!product.id.isNullOrEmpty()) {
 
-                    var req = JsonObject()
+
                     val products = JsonObject()
-                    val history = JsonObject()
-                    var property = ""
+                    val history = createHistoryJsonForCartAndFavourite(product)
+
+                    val property = "wishlist"
 
                     products.addProperty("productId", product.id)
                     products.addProperty("count", product.count)
 
-                    history.addProperty("productId", product.id)
-                    history.addProperty("categoryId", product.categoryId)
-                    history.addProperty("count", product.count)
-                    history.addProperty("price", product.price)
-                    history.addProperty("picture", product.picture)
-
-
                     history.addProperty("action", "productDislike")
-                    property = "wishlist"
 
-
-                    req = JsonObject().apply {
+                    val req = JsonObject().apply {
                         add(property, JsonObject()
                             .apply {
                                 addProperty("lastUpdate", System.currentTimeMillis())
@@ -1335,7 +1385,6 @@ object EnkodPushLibrary {
         }
     }
 
-
     fun productBuy(order: Order) {
 
         initLibObserver.observable.subscribe {
@@ -1373,6 +1422,30 @@ object EnkodPushLibrary {
                         addProperty("picture", order.picture)
                     }
 
+                    if (order.params != null) {
+                        val paramMap = order.params
+
+                        for (key in paramMap!!.keys) {
+
+                            val value = paramMap[key]
+
+                            try {
+
+                                when (value) {
+
+                                    is String -> addProperty(key, value)
+                                    is Int -> addProperty(key, value)
+                                    is Boolean -> addProperty(key, value)
+                                    is Float -> addProperty(key, value)
+                                    is Double -> addProperty(key, value)
+                                    else -> addProperty(key, value.toString())
+
+                                }
+                            } catch (e: Exception) {
+                                logInfo ("error createMapHistory $e")
+                            }
+                        }
+                    }
                 })
 
                 val req = JsonObject().apply {
@@ -1452,7 +1525,7 @@ object EnkodPushLibrary {
             }
         }
     }
-}
+ }
 
 class InitLibObserver<T>(private val defaultValue: T) {
     var value: T = defaultValue

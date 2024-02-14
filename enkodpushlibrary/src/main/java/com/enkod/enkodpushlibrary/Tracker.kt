@@ -1,13 +1,12 @@
 package com.enkod.enkodpushlibrary
 
-import com.google.gson.JsonObject
-
 data class Product(
-    var id: String,
+    var id: String?,
     var categoryId: String?,
     var count: Int?,
     var price: String?,
-    var picture: String?
+    var picture: String?,
+    var params: Map <String, Any>?
 )
 
 data class Order(
@@ -16,7 +15,8 @@ data class Order(
     var count: Int?,
     var price: String?,
     var picture: String?,
-    var sum: Double?
+    var sum: Double?,
+    var params: Map <String, Any>?
 )
 
 data class PageUrl(
@@ -33,7 +33,6 @@ data class UpdateTokenResponse(
     var sessionId: String = "",
     var token: String = ""
 )
-
 
 data class GetTokenResponse(
     var token: String = "",
