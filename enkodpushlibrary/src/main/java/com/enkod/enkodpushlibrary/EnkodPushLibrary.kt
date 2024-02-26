@@ -61,7 +61,6 @@ import com.enkod.enkodpushlibrary.Variables.personId
 import com.enkod.enkodpushlibrary.Variables.soundOn
 import com.enkod.enkodpushlibrary.Variables.title
 import com.enkod.enkodpushlibrary.Variables.vibrationOn
-import com.example.jetpack_new.R
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.RemoteMessage
 import com.google.gson.Gson
@@ -98,7 +97,7 @@ object EnkodPushLibrary {
     internal var url: String = "url"
 
     internal val vibrationPattern = longArrayOf(1500, 500)
-    internal val defaultIconId: Int = R.drawable.ic_android_black_24dp
+    internal val defaultIconId: Int = R.drawable.ic_launcher_foreground
 
     internal val initLibObserver = InitLibObserver(false)
     internal val pushLoadObserver = PushLoadObserver(false)
