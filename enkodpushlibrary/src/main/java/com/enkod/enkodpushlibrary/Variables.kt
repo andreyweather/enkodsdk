@@ -16,9 +16,9 @@ object Variables {
     internal var messageId = "messageId"
     internal var ledColor = "led"
     internal var start = "start"
-    internal var defaultTimeUpdateToken = 336
+    internal var defaultTimeManualUpdateToken = 550
+    internal var defaultTimeAutoUpdateToken = 500
     internal var defaultTimeVerificationToken = 1
-    internal var defaultTimeRefreshAppInMemory = 12
     internal var defaultImageLoadTimeout = 15000
     internal var millisInHours = 3600000
 

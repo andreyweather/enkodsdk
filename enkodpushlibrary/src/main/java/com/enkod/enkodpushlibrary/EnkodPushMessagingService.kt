@@ -1,16 +1,17 @@
 package com.enkod.enkodpushlibrary
 
-import android.annotation.SuppressLint
+import android.content.Intent
 import android.os.Build
 import android.util.Log
-import androidx.annotation.RequiresApi
-import com.enkod.enkodpushlibrary.EnkodPushLibrary.initPreferences
-import com.enkod.enkodpushlibrary.EnkodPushLibrary.initRetrofit
-import com.enkod.enkodpushlibrary.EnkodPushLibrary.loadImageFromUrl
-import com.enkod.enkodpushlibrary.EnkodPushLibrary.processMessage
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
+import androidx.work.WorkManager
+import com.enkod.enkodpushlibrary.EnkodPushLibrary.creatureInputDataFromMessage
+import com.enkod.enkodpushlibrary.EnkodPushLibrary.isAppInforegrounded
+import com.enkod.enkodpushlibrary.EnkodPushLibrary.logInfo
+import com.enkod.enkodpushlibrary.EnkodPushLibrary.managingTheNotificationCreationProcess
 import com.enkod.enkodpushlibrary.Preferences.MESSAGEID_TAG
 import com.enkod.enkodpushlibrary.Preferences.TAG
-import com.enkod.enkodpushlibrary.Variables.imageUrl
 import com.enkod.enkodpushlibrary.Variables.messageId
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
@@ -18,14 +19,11 @@ import com.google.firebase.messaging.RemoteMessage
 
 class EnkodPushMessagingService : FirebaseMessagingService() {
 
-    override fun onCreate() {
-        super.onCreate()
-    }
 
     override fun onNewToken(token: String) {
         super.onNewToken(token)
 
-        Log.d("onNewToken", token)
+        logInfo("new token $token")
 
     }
 
@@ -34,8 +32,6 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
         EnkodPushLibrary.onDeletedMessage()
     }
 
-    @SuppressLint("CheckResult")
-    @RequiresApi(Build.VERSION_CODES.O)
 
     override fun onMessageReceived(message: RemoteMessage) {
 
@@ -43,17 +39,42 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
 
         super.onMessageReceived(message)
 
-        EnkodPushLibrary.pushLoadObserver.value = false
+        logInfo("message.priority ${message.priority}")
 
 
-/*
-        if (!isAppInforegrounded()) {
-            val service = Intent(this, InternetService::class.java)
-            this.startForegroundService(service)
+        val dataFromPush = creatureInputDataFromMessage(message).keyValueMap as Map<String,String>
+
+        fun showPushWorkManager() {
+
+            Log.d("onMessageReceived", "showPushWorkManager")
+
+            val workRequest = OneTimeWorkRequestBuilder<LoadImageWorker>()
+
+                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                .setInputData(creatureInputDataFromMessage(message))
+                .build()
+
+            WorkManager
+
+                .getInstance(applicationContext)
+                .enqueue(workRequest)
+
         }
 
- */
+        if (!isAppInforegrounded()) {
 
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+
+                if (Build.VERSION.SDK_INT < 31) {
+                    Log.d("Build.VERSION", Build.VERSION.SDK_INT.toString() )
+                    val service = Intent(this, InternetService::class.java)
+                    this.startForegroundService(service)
+
+                } else if (Build.VERSION.SDK_INT >= 31) {
+                    showPushWorkManager()
+                }
+            }
+        }
 
         val preferences = applicationContext.getSharedPreferences(TAG, MODE_PRIVATE)
 
@@ -61,39 +82,19 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
             .remove(MESSAGEID_TAG).apply()
 
         preferences.edit()
-            .putString(MESSAGEID_TAG, "${message.data[messageId]}")
+            .putString(MESSAGEID_TAG, "${dataFromPush[messageId]}")
             .apply()
 
-
-        if (!message.data[imageUrl].isNullOrEmpty()) {
-
-
-
-            loadImageFromUrl(applicationContext, message.data[imageUrl]!!).subscribe(
-
-                {
-                    bitmap ->
-                    Log.d("onMessageReceived", "ok")
-                    processMessage(applicationContext, message, bitmap)
-                },
-
-                {
-                    error ->
-                    Log.d("onMessageReceived", error.toString())
-                    processMessage(applicationContext, message, null)
-
-                }
-            )
-
-        } else {
-            processMessage(applicationContext, message, null)
-        }
-
-        initRetrofit(applicationContext)
-        initPreferences(applicationContext)
+        managingTheNotificationCreationProcess (applicationContext, dataFromPush)
 
     }
 }
+
+
+
+
+
+
 
 
 

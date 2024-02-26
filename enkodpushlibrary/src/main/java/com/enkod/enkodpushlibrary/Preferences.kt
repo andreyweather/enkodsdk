@@ -7,10 +7,10 @@ object Preferences {
     internal const val TOKEN_TAG: String = "${TAG}_TOKEN"
     internal const val ACCOUNT_TAG: String = "${TAG}_ACCOUNT"
     internal const val MESSAGEID_TAG = "${TAG}_MESSAGEID"
-    internal const val WORKER_TAG: String = "${TAG}_WORKER"
-    internal const val START_TIMER_TAG: String = "${TAG}_STARTTIMER"
-    internal const val TIME_TAG: String = "${TAG}_TIME"
+    internal const val START_AUTO_UPDATE_TAG = "${TAG}_STARTAUTOUPDATE"
     internal const val TIME_VERIFICATION_TAG = "${TAG}_VERIFICATION"
+    internal const val TIME_LAST_TOKEN_UPDATE_TAG = "${TAG}_TIMELASTTOKENUPDATE"
+    internal const val TIME_TOKEN_AUTO_UPDATE_TAG = "${TAG}_TIMETOKENAUTOUPDATE"
     internal const val LOAD_TIMEOUT_TAG: String = "${TAG}_LOADTIMEOUTTAG"
     internal const val DEV_TAG: String = "${TAG}_DEV"
 

@@ -6,20 +6,19 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
-import android.util.Log
-import androidx.annotation.RequiresApi
 import com.enkod.enkodpushlibrary.EnkodPushLibrary.logInfo
 import com.enkod.enkodpushlibrary.Preferences.ACCOUNT_TAG
 import com.enkod.enkodpushlibrary.Preferences.TAG
+import com.example.enkodpushlibrary.TokenVerification.verificationOfTokenWorker
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-class UpdateTokenService : Service() {
+class TokenManualUpdateService : Service() {
 
-    @RequiresApi(Build.VERSION_CODES.O)
+
     override fun onCreate() {
         super.onCreate()
 
@@ -30,16 +29,17 @@ class UpdateTokenService : Service() {
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
             )
         } else {
-            startForeground(1, EnkodPushLibrary.createdNotificationForNetworkService(this))
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForeground(1, EnkodPushLibrary.createdNotificationForNetworkService(this))
+            }
         }
-
 
         CoroutineScope(Dispatchers.IO).launch {
 
             delay(3000)
 
+            EnkodPushLibrary.initPreferences(applicationContext)
             EnkodPushLibrary.initRetrofit(applicationContext)
-
 
             val preferences = applicationContext.getSharedPreferences(TAG, Context.MODE_PRIVATE)
 
@@ -48,8 +48,6 @@ class UpdateTokenService : Service() {
             if (preferencesAcc != null) {
 
                 try {
-
-                    EnkodPushLibrary.initRetrofit(applicationContext)
 
                     FirebaseMessaging.getInstance().deleteToken()
 
@@ -68,10 +66,14 @@ class UpdateTokenService : Service() {
                                             preferencesAcc,
                                             token
                                         )
+                                        logInfo ("token manual update" )
 
-                                        BackgroundTasks(applicationContext).verificationOfTokenWorker(
-                                            applicationContext
-                                        )
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+
+                                            verificationOfTokenWorker(
+                                                applicationContext
+                                            )
+                                        }
 
                                         CoroutineScope(Dispatchers.IO).launch {
 
@@ -114,9 +116,7 @@ class UpdateTokenService : Service() {
         }
     }
 
-
     override fun onBind(intent: Intent): IBinder {
         TODO("Return the communication channel to the service.")
     }
-
 }

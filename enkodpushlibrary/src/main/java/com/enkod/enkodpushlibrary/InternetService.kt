@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
-import android.util.Log
 import androidx.annotation.RequiresApi
 import com.enkod.enkodpushlibrary.EnkodPushLibrary.createdNotificationForNetworkService
 import com.enkod.enkodpushlibrary.EnkodPushLibrary.logInfo
@@ -25,7 +24,6 @@ class InternetService : Service() {
 
         logInfo("serviceCreated")
 
-        Log.d ("onMessageReceived", "craatedService")
 
         super.onCreate()
 
@@ -35,21 +33,53 @@ class InternetService : Service() {
 
         }
 
+        var startAutoUpdateToken = false
+
+        EnkodPushLibrary.startTokenAutoUpdateObserver.observable.subscribe { start ->
+
+            if (start) {
+
+                startAutoUpdateToken = start
+            }
+        }
+
+
         EnkodPushLibrary.pushLoadObserver.observable.subscribe {completed ->
 
             if (completed) {
 
-                    logInfo("stopSelf")
-                    stopSelf()
-                    exitProcess(0)
+
+                when (startAutoUpdateToken) {
+
+                    false -> {
+                        logInfo("stopSelf")
+
+                        stopSelf()
+                        exitProcess(0)
+                    }
+
+                    else -> {
+
+                        EnkodPushLibrary.initLibObserver.observable.subscribe { update ->
+
+                            if (update) {
+
+                                logInfo("stopSelf + tokenUpdate")
+                                stopSelf()
+                                exitProcess(0)
+
+                            }
+                        }
+                    }
                 }
+            }
         }
 
         CoroutineScope(Dispatchers.IO).launch {
 
             delay(3400)
 
-            logInfo("startSelf")
+           logInfo("startSelf")
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 if (Build.VERSION.SDK_INT >= 34) {
@@ -58,9 +88,10 @@ class InternetService : Service() {
                         createdNotificationForNetworkService(applicationContext),
                         ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
                     )
+                }else {
+
+                    startForeground(1, createdNotificationForNetworkService(applicationContext))
                 }
-            } else {
-                startForeground(1, createdNotificationForNetworkService(applicationContext))
             }
         }
 

@@ -4,19 +4,19 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.os.PowerManager
-import android.util.Log
 import com.enkod.enkodpushlibrary.EnkodPushLibrary.isAppInforegrounded
 import com.enkod.enkodpushlibrary.EnkodPushLibrary.logInfo
 import com.enkod.enkodpushlibrary.Preferences.LOAD_TIMEOUT_TAG
-import com.enkod.enkodpushlibrary.Preferences.START_TIMER_TAG
+import com.enkod.enkodpushlibrary.Preferences.START_AUTO_UPDATE_TAG
 import com.enkod.enkodpushlibrary.Preferences.TAG
-import com.enkod.enkodpushlibrary.Preferences.TIME_TAG
+import com.enkod.enkodpushlibrary.Preferences.TIME_LAST_TOKEN_UPDATE_TAG
+import com.enkod.enkodpushlibrary.Preferences.TIME_TOKEN_AUTO_UPDATE_TAG
 import com.enkod.enkodpushlibrary.Preferences.TIME_VERIFICATION_TAG
-import com.enkod.enkodpushlibrary.Preferences.WORKER_TAG
+import com.enkod.enkodpushlibrary.TokenAutoUpdate.startAutoUpdatesUsingJobScheduler
+import com.enkod.enkodpushlibrary.TokenAutoUpdate.startAutoUpdatesUsingWorkManager
 import com.enkod.enkodpushlibrary.Variables.defaultImageLoadTimeout
-import com.enkod.enkodpushlibrary.Variables.defaultTimeRefreshAppInMemory
-import com.enkod.enkodpushlibrary.Variables.defaultTimeUpdateToken
+import com.enkod.enkodpushlibrary.Variables.defaultTimeAutoUpdateToken
+import com.enkod.enkodpushlibrary.Variables.defaultTimeManualUpdateToken
 import com.enkod.enkodpushlibrary.Variables.defaultTimeVerificationToken
 import com.enkod.enkodpushlibrary.Variables.millisInHours
 import com.enkod.enkodpushlibrary.Variables.start
@@ -27,45 +27,45 @@ import com.google.firebase.messaging.FirebaseMessaging
 class EnkodConnect(
 
     _account: String?,
-    _tokenUpdate: Boolean? = false,
-    _refreshAppInMemory: Boolean? = false,
-    _timeTokenUpdate: Int? = defaultTimeUpdateToken,
+    _tokenManualUpdate: Boolean? = false,
+    _tokenAutoUpdate: Boolean? = false,
+    _timeTokenManualUpdate: Int? = defaultTimeManualUpdateToken,
+    _timeTokenAutoUpdate: Int? = defaultTimeAutoUpdateToken,
     _timeTokenVerification: Int? = defaultTimeVerificationToken,
-    _timeRefreshAppInMemory: Int? = defaultTimeRefreshAppInMemory,
     _imageLoadTimeout: Int? = defaultImageLoadTimeout
 
 
 ) {
 
     private val account: String
-    private val tokenUpdate: Boolean
-    private val refreshAppInMemory: Boolean
-    private var timeTokenUpdate: Int
+    private val tokenManualUpdate: Boolean
+    private val tokenAutoUpdate: Boolean
+    private var timeTokenManualUpdate: Int
+    private var timeTokenAutoUpdate: Int
     private var timeTokenVerification: Int
-    private var timeRefreshAppInMemory: Int
     private var imageLoadTimeout: Int
 
 
     init {
 
         account = _account ?: ""
-        tokenUpdate = _tokenUpdate ?: false
-        refreshAppInMemory = _refreshAppInMemory ?: false
+        tokenManualUpdate = _tokenManualUpdate ?: false
+        tokenAutoUpdate = _tokenAutoUpdate ?: false
 
-        timeTokenUpdate =
+        timeTokenManualUpdate =
 
-            if (_timeTokenUpdate != null && _timeTokenUpdate > 0) _timeTokenUpdate
-            else defaultTimeUpdateToken
+            if (_timeTokenManualUpdate != null && _timeTokenManualUpdate > 0) _timeTokenManualUpdate
+            else defaultTimeManualUpdateToken
+
+        timeTokenAutoUpdate =
+
+            if (_timeTokenAutoUpdate != null && _timeTokenAutoUpdate > 0) _timeTokenAutoUpdate
+            else defaultTimeAutoUpdateToken
 
         timeTokenVerification =
 
             if (_timeTokenVerification != null && _timeTokenVerification > 0) _timeTokenVerification
             else defaultTimeVerificationToken
-
-        timeRefreshAppInMemory =
-
-            if (_timeRefreshAppInMemory != null && _timeRefreshAppInMemory > 0) _timeRefreshAppInMemory
-            else defaultTimeRefreshAppInMemory
 
         imageLoadTimeout =
 
@@ -78,38 +78,47 @@ class EnkodConnect(
     @SuppressLint("BatteryLife")
     fun start(context: Context) {
 
-
-
-        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager?
-        val inWhiteList = powerManager!!.isIgnoringBatteryOptimizations(context.getPackageName())
-        Log.d ("WhiteList", "$inWhiteList ${context.getPackageName()}")
-
-
+        logInfo( "user settings: $account, $tokenManualUpdate, $tokenAutoUpdate, $timeTokenManualUpdate, $timeTokenAutoUpdate")
 
         val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
-        val preferencesWorker = preferences.getString(WORKER_TAG, null)
-        val preferencesStartTimer = preferences.getString(START_TIMER_TAG, null)
+        val preferencesStartTokenAutoUpdate = preferences.getString(START_AUTO_UPDATE_TAG, null)
 
 
         preferences.edit()
             .putInt(LOAD_TIMEOUT_TAG, imageLoadTimeout)
             .apply()
 
+        preferences.edit()
+            .putInt(TIME_VERIFICATION_TAG, timeTokenVerification)
+            .apply()
 
 
-        if (preferencesStartTimer == null && tokenUpdate) {
+
+        if (preferencesStartTokenAutoUpdate == null && tokenAutoUpdate) {
 
             preferences.edit()
 
-                .putLong(TIME_TAG, System.currentTimeMillis())
+                .putInt(TIME_TOKEN_AUTO_UPDATE_TAG, timeTokenAutoUpdate)
                 .apply()
 
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+
+                startAutoUpdatesUsingWorkManager(context, timeTokenAutoUpdate)
+
+            } else {
+
+                startAutoUpdatesUsingJobScheduler(context, timeTokenAutoUpdate)
+
+            }
+
             preferences.edit()
 
-                .putString(START_TIMER_TAG, start)
+                .putString(START_AUTO_UPDATE_TAG, start)
                 .apply()
 
         }
+
 
 
         if (EnkodPushLibrary.isOnline(context)) {
@@ -126,9 +135,10 @@ class EnkodConnect(
 
                     val token = task.result
 
+                    logInfo("start library with fcm")
+
                     EnkodPushLibrary.init(context, account, token)
 
-                    logInfo("start library with fcm")
                 })
 
             } catch (e: Exception) {
@@ -147,69 +157,43 @@ class EnkodConnect(
         }
 
 
-        if (preferencesWorker == null && refreshAppInMemory) {
-            BackgroundTasks(context).refreshInMemoryWorker(timeRefreshAppInMemory)
-        }
+        if (tokenManualUpdate) {
 
+            tokenUpdate(context, timeTokenManualUpdate)
 
-        if (tokenUpdate) {
-
-            tokenUpdate(context, timeTokenUpdate)
-
-            preferences.edit()
-                .putInt(TIME_VERIFICATION_TAG, timeTokenVerification)
-                .apply()
-
-        }else {
-            when (preferencesStartTimer) {
-
-                null -> return
-                else -> {
-
-                    preferences.edit()
-                        .remove(START_TIMER_TAG).apply()
-
-                    preferences.edit()
-                        .remove(TIME_TAG).apply()
-
-                }
-            }
         }
     }
 
-    private fun tokenUpdate(context: Context, timeInHours: Int) {
 
-        val timeUpdateInMillis: Long = (timeInHours * millisInHours).toLong()
+    private fun tokenUpdate(context: Context, timeUpdate: Int) {
+
+        val timeUpdateInMillis: Long = (timeUpdate * millisInHours).toLong()
 
         val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
-        val preferencesTime = preferences.getLong(TIME_TAG, 0)
+        val timeLastTokenUpdate = preferences.getLong(TIME_LAST_TOKEN_UPDATE_TAG, 0)
 
         if (isAppInforegrounded()) {
 
             if (EnkodPushLibrary.isOnline(context)) {
 
-                if ((System.currentTimeMillis() - preferencesTime) > timeUpdateInMillis) {
+                if (timeLastTokenUpdate > 0) {
 
+                    if ((System.currentTimeMillis() - timeLastTokenUpdate) > timeUpdateInMillis) {
 
+                        logInfo("start manual update in start method")
 
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        context.startForegroundService(
-                            Intent(
-                                context,
-                                UpdateTokenService::class.java
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            context.startForegroundService(
+                                Intent(
+                                    context,
+                                    TokenManualUpdateService::class.java
+                                )
                             )
-                        )
+                        }
                     }
-
-                    preferences.edit()
-                        .remove(TIME_TAG).apply()
-
-                    preferences.edit()
-                        .putLong(TIME_TAG, System.currentTimeMillis())
-                        .apply()
-
                 }
             }
         }
     }
 }
+

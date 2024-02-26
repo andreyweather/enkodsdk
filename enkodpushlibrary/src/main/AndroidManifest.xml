@@ -15,22 +15,20 @@
         android:enabled="true"
         android:usesCleartextTraffic="true">
 
-        <service
-            android:name="com.enkod.enkodpushlibrary.RefreshAppInMemoryService"
-            android:enabled="true"
-            android:exported="false"
-            android:usesCleartextTraffic="true"
-            android:foregroundServiceType = "dataSync"
-            />
 
         <service
-            android:name="com.enkod.enkodpushlibrary.UpdateTokenService"
+            android:name="com.enkod.enkodpushlibrary.TokenManualUpdateService"
             android:enabled="true"
             android:exported="false"
             android:usesCleartextTraffic="true"
             android:foregroundServiceType = "dataSync"
             android:directBootAware = "true"
             />
+
+        <service android:name="com.enkod.enkodpushlibrary.TokenAutoUpdate$TokenAutoUpdateJobService"
+            android:permission="android.permission.BIND_JOB_SERVICE" >
+
+        </service>
 
         <service
             android:name="com.enkod.enkodpushlibrary.InternetService"

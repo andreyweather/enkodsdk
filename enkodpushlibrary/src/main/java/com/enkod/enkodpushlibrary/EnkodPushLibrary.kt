@@ -1,13 +1,17 @@
 package com.enkod.enkodpushlibrary
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.ActivityManager
 import android.app.Notification
+import android.app.Notification.FOREGROUND_SERVICE_IMMEDIATE
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.app.job.JobScheduler
 import android.content.Context
+import android.content.Context.JOB_SCHEDULER_SERVICE
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -28,7 +32,10 @@ import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.os.bundleOf
+import androidx.work.Data
 import androidx.work.WorkManager
+import androidx.work.Worker
+import androidx.work.WorkerParameters
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.model.GlideUrl
 import com.bumptech.glide.load.model.LazyHeaders
@@ -36,14 +43,15 @@ import com.bumptech.glide.request.target.CustomTarget
 import com.bumptech.glide.request.transition.Transition
 import com.enkod.enkodpushlibrary.Preferences.ACCOUNT_TAG
 import com.enkod.enkodpushlibrary.Preferences.DEV_TAG
+import com.enkod.enkodpushlibrary.Preferences.LOAD_TIMEOUT_TAG
 import com.enkod.enkodpushlibrary.Preferences.MESSAGEID_TAG
 import com.enkod.enkodpushlibrary.Preferences.SESSION_ID_TAG
-import com.enkod.enkodpushlibrary.Preferences.START_TIMER_TAG
+import com.enkod.enkodpushlibrary.Preferences.START_AUTO_UPDATE_TAG
 import com.enkod.enkodpushlibrary.Preferences.TAG
-import com.enkod.enkodpushlibrary.Preferences.TIME_TAG
+import com.enkod.enkodpushlibrary.Preferences.TIME_LAST_TOKEN_UPDATE_TAG
+import com.enkod.enkodpushlibrary.Preferences.TIME_TOKEN_AUTO_UPDATE_TAG
 import com.enkod.enkodpushlibrary.Preferences.TIME_VERIFICATION_TAG
 import com.enkod.enkodpushlibrary.Preferences.TOKEN_TAG
-import com.enkod.enkodpushlibrary.Preferences.WORKER_TAG
 import com.enkod.enkodpushlibrary.Variables.body
 import com.enkod.enkodpushlibrary.Variables.ledColor
 import com.enkod.enkodpushlibrary.Variables.ledOffMs
@@ -53,6 +61,7 @@ import com.enkod.enkodpushlibrary.Variables.personId
 import com.enkod.enkodpushlibrary.Variables.soundOn
 import com.enkod.enkodpushlibrary.Variables.title
 import com.enkod.enkodpushlibrary.Variables.vibrationOn
+import com.example.jetpack_new.R
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.RemoteMessage
 import com.google.gson.Gson
@@ -78,7 +87,6 @@ object EnkodPushLibrary {
     private const val baseUrl = "https://ext.enkod.ru/"
     internal const val chanelEnkod = "enkod_lib_1"
 
-
     internal var isOnline = true
     internal var addContactAccess = false
 
@@ -90,10 +98,12 @@ object EnkodPushLibrary {
     internal var url: String = "url"
 
     internal val vibrationPattern = longArrayOf(1500, 500)
-    internal val defaultIconId: Int = R.drawable.ic_launcher_foreground
+    internal val defaultIconId: Int = R.drawable.ic_android_black_24dp
 
     internal val initLibObserver = InitLibObserver(false)
     internal val pushLoadObserver = PushLoadObserver(false)
+    internal val startTokenAutoUpdateObserver = StartTokenAutoUpdateObserver(false)
+
 
     private var onPushClickCallback: (Bundle, String) -> Unit = { _, _ -> }
     private var onDynamicLinkClick: ((String) -> Unit)? = null
@@ -136,8 +146,14 @@ object EnkodPushLibrary {
                     preferences.edit()
                         .putString(TOKEN_TAG, token)
                         .apply()
+
+                    preferences.edit()
+                        .putLong (TIME_LAST_TOKEN_UPDATE_TAG, System.currentTimeMillis())
+                        .apply()
+
                     this.token = token
 
+                    logInfo( "TokenUpdate")
 
                     if (!sessionId.isNullOrEmpty()) {
 
@@ -378,6 +394,7 @@ object EnkodPushLibrary {
                 addContactAccess = true
                 initLibObserver.value = true
 
+
             }
 
             override fun onFailure(call: Call<UpdateTokenResponse>, t: Throwable) {
@@ -400,7 +417,11 @@ object EnkodPushLibrary {
 
         initLibObserver.observable.subscribe {
 
+            Log.d ("observable", "ok")
+
             if (it) {
+
+                Log.d ("observable", "in contact")
 
                 if (isOnline) {
 
@@ -586,25 +607,50 @@ object EnkodPushLibrary {
         preferences.edit().remove(TOKEN_TAG).apply()
         token = ""
 
-        preferences.edit().remove(WORKER_TAG).apply()
-        preferences.edit().remove(START_TIMER_TAG).apply()
-        preferences.edit().remove(TIME_TAG).apply()
+
         preferences.edit().remove(TIME_VERIFICATION_TAG).apply()
         preferences.edit().remove(DEV_TAG).apply()
-        preferences.edit().remove(Preferences.LOAD_TIMEOUT_TAG).apply()
+        preferences.edit().remove(LOAD_TIMEOUT_TAG).apply()
+        preferences.edit().remove(TIME_LAST_TOKEN_UPDATE_TAG).apply()
+        preferences.edit().remove(START_AUTO_UPDATE_TAG).apply()
+        preferences.edit().remove(TIME_TOKEN_AUTO_UPDATE_TAG).apply()
 
-
-        WorkManager.getInstance(context).cancelUniqueWork("refreshInMemoryWorker")
         WorkManager.getInstance(context).cancelUniqueWork("verificationOfTokenWorker")
+        WorkManager.getInstance(context).cancelUniqueWork("tokenAutoUpdateWorker")
+
+        val scheduler = context.getSystemService(JOB_SCHEDULER_SERVICE) as JobScheduler?
+
+        when (scheduler){
+
+            null -> return
+            else -> scheduler.cancel(1)
+        }
 
         initLibObserver.value = false
 
-    }
+        logInfo("logOut")
 
+    }
 
     internal fun logInfo(msg: String) {
         Log.d("enkodLibrary", "${msg}")
         Log.i(TAG, msg)
+    }
+
+    fun creatureInputDataFromMessage (message: RemoteMessage): Data {
+
+        val dataBuilder = Data.Builder()
+
+        for (key in message.data.keys) {
+
+            if (!message.data[key].isNullOrEmpty())  {
+                dataBuilder.putString(key, message.data[key])
+            }
+        }
+
+        val inputData = dataBuilder.build()
+
+        return inputData
     }
 
 
@@ -648,7 +694,38 @@ object EnkodPushLibrary {
         }
     }
 
-    fun processMessage(context: Context, message: RemoteMessage, image: Bitmap?) {
+    @SuppressLint("CheckResult")
+    fun managingTheNotificationCreationProcess (context: Context, message: Map <String,String>) {
+
+        if (!message[Variables.imageUrl].isNullOrEmpty()) {
+
+            loadImageFromUrl(context, message[Variables.imageUrl]!!).subscribe(
+
+                {
+                        bitmap ->
+                    logInfo("onMessageReceived successful image upload")
+                    processMessage(context, message, bitmap)
+                },
+
+                {
+                        error ->
+                    logInfo ("onMessageReceived error image upload: $error")
+                    processMessage(context, message, null)
+
+                }
+            )
+
+        } else {
+            logInfo("onMessageReceived without image url")
+            processMessage(context, message, null)
+        }
+
+        initRetrofit(context)
+        initPreferences(context)
+    }
+
+
+    fun processMessage(context: Context, message: Map<String, String>, image: Bitmap?) {
 
         createNotificationChannelForPush(context)
         createNotification(context, message, image)
@@ -668,11 +745,23 @@ object EnkodPushLibrary {
             channel
         )
 
-        val notification: Notification = NotificationCompat.Builder(context, CHANNEL_ID)
+
+        val builder = Notification.Builder(context, CHANNEL_ID)
+
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+        } else {
+            builder
+                .setForegroundServiceBehavior(FOREGROUND_SERVICE_IMMEDIATE)
+        }
+
+
+        builder
             .setContentTitle("")
             .setContentText("").build()
 
-        return notification
+
+        return builder.build()
     }
 
     fun createNotificationChannelForPush (context: Context) {
@@ -693,11 +782,11 @@ object EnkodPushLibrary {
         }
     }
 
-    fun createNotification(context: Context, message: RemoteMessage, image: Bitmap?) {
+    fun createNotification(context: Context, message: Map<String, String>, image: Bitmap?) {
 
-        with(message.data) {
+        with(message) {
 
-            val data = message.data
+            val data = message
 
             var url = ""
 
@@ -708,7 +797,7 @@ object EnkodPushLibrary {
             val builder = NotificationCompat.Builder(context, chanelEnkod)
 
             val pendingIntent: PendingIntent = getIntent(
-                context, message.data, "", url
+                context, message, "", url
             )
 
             builder
@@ -724,7 +813,7 @@ object EnkodPushLibrary {
                 .setColor(Color.BLACK)
                 .setContentIntent(pendingIntent)
                 .setAutoCancel(true)
-                .addActions(context, message.data)
+                .addActions(context, message)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
 
 
@@ -756,7 +845,7 @@ object EnkodPushLibrary {
                     return
                 }
 
-                notify(message.data[messageId]!!.toInt(), builder.build())
+                notify(message[messageId]!!.toInt(), builder.build())
 
                pushLoadObserver.value = true
 
@@ -1091,7 +1180,39 @@ class PushLoadObserver<T>(private val defaultValue: T) {
     val observable = BehaviorSubject.create<T>(value)
 }
 
+class StartTokenAutoUpdateObserver<T>(private val defaultValue: T) {
+    var value: T = defaultValue
+        set(value) {
+            field = value
+            observable.onNext(value)
+        }
+    val observable = BehaviorSubject.create<T>(value)
+}
 
+
+class LoadImageWorker (context: Context, workerParameters: WorkerParameters) :
+    Worker(context, workerParameters) {
+
+    @SuppressLint("CheckResult")
+    override fun doWork(): Result {
+
+        Log.d("onMessageReceived", "doWork")
+
+        return try {
+
+            val inputData = inputData
+
+            val message = inputData.keyValueMap as Map<String,String>
+
+            EnkodPushLibrary.managingTheNotificationCreationProcess(applicationContext, message)
+
+            Result.success()
+        } catch (e: Exception) {
+
+            Result.failure();
+        }
+    }
+}
 
 
 
