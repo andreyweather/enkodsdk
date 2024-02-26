@@ -2,13 +2,10 @@ package com.example.enkodpushlibrary
 
 import android.content.Context
 import android.os.Build
-import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.OutOfQuotaPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.Worker
@@ -16,7 +13,7 @@ import androidx.work.WorkerParameters
 import com.enkod.enkodpushlibrary.EnkodPushLibrary
 import com.enkod.enkodpushlibrary.GetTokenResponse
 import com.enkod.enkodpushlibrary.Preferences
-import com.enkod.enkodpushlibrary.Variables.defaultTimeVerificationToken
+import com.enkod.enkodpushlibrary.Variables
 import com.google.android.gms.tasks.OnCompleteListener
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.CoroutineScope
@@ -30,35 +27,24 @@ import java.util.concurrent.TimeUnit
 
 internal object TokenVerification {
 
-    class verificationOfTokenWorkManager(
-        context: Context,
-        workerParameters: WorkerParameters
-    ) :
-
-        Worker(context, workerParameters) {
-
-
-        @RequiresApi(Build.VERSION_CODES.O)
-        override fun doWork(): Result {
-
-            verificationExpedition(applicationContext)
-
-            return Result.success()
-
-        }
-    }
-
 
     internal fun verificationOfTokenWorker(context: Context) {
+
+        EnkodPushLibrary.logInfo("start verification function")
 
         val preferences = context.getSharedPreferences(Preferences.TAG, Context.MODE_PRIVATE)
 
         val preferencesTimeVerification: Int? =
-            preferences.getInt(Preferences.TIME_VERIFICATION_TAG, defaultTimeVerificationToken)
+            preferences.getInt(Preferences.TIME_VERIFICATION_TAG,
+                Variables.defaultTimeVerificationToken
+            )
 
-        val time = preferencesTimeVerification ?: defaultTimeVerificationToken
+        val time = preferencesTimeVerification ?: Variables.defaultTimeVerificationToken
 
-        val constraint = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+        EnkodPushLibrary.logInfo(time.toString())
+
+        val constraint =
+            Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
 
         val workRequest =
 
@@ -66,7 +52,6 @@ internal object TokenVerification {
                 time.toLong(),
                 TimeUnit.HOURS
             )
-
                 .setConstraints(constraint)
                 .build()
 
@@ -81,27 +66,21 @@ internal object TokenVerification {
 
     }
 
-    fun verificationExpedition(context: Context) {
 
-        val workRequest = OneTimeWorkRequestBuilder<VerificationExpeditionWorker>()
+    class verificationOfTokenWorkManager(
+        context: Context,
+        workerParameters: WorkerParameters
+    ) :
 
-            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-            .build()
-
-        WorkManager
-
-            .getInstance(context)
-            .enqueue(workRequest)
-
-    }
-
-    class VerificationExpeditionWorker(context: Context, workerParameters: WorkerParameters) :
         Worker(context, workerParameters) {
+
 
         @RequiresApi(Build.VERSION_CODES.O)
         override fun doWork(): Result {
 
             CoroutineScope(Dispatchers.IO).launch {
+
+                EnkodPushLibrary.logInfo("verification in process")
 
                 delay(1000)
 
@@ -144,7 +123,9 @@ internal object TokenVerification {
                     }
                 }
             }
+
             return Result.success()
+
         }
     }
 
@@ -188,7 +169,7 @@ internal object TokenVerification {
                                 .cancelUniqueWork("verificationOfTokenWorker")
 
                             EnkodPushLibrary.logInfo("token verification true")
-                            Log.d("verification", "ok")
+
 
                         } else {
 
@@ -204,13 +185,10 @@ internal object TokenVerification {
             override fun onFailure(call: Call<GetTokenResponse>, t: Throwable) {
 
                 EnkodPushLibrary.logInfo("token verification error retrofit $t")
-                Log.d("verification", "error")
 
                 return
 
             }
         })
     }
-
-
 }

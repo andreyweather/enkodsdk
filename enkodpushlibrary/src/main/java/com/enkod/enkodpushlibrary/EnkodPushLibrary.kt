@@ -61,6 +61,7 @@ import com.enkod.enkodpushlibrary.Variables.personId
 import com.enkod.enkodpushlibrary.Variables.soundOn
 import com.enkod.enkodpushlibrary.Variables.title
 import com.enkod.enkodpushlibrary.Variables.vibrationOn
+import com.example.jetpack_new.R
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.RemoteMessage
 import com.google.gson.Gson
@@ -97,7 +98,7 @@ object EnkodPushLibrary {
     internal var url: String = "url"
 
     internal val vibrationPattern = longArrayOf(1500, 500)
-    internal val defaultIconId: Int = R.drawable.ic_launcher_foreground
+    internal val defaultIconId: Int = R.drawable.ic_android_black_24dp
 
     internal val initLibObserver = InitLibObserver(false)
     internal val pushLoadObserver = PushLoadObserver(false)
@@ -152,7 +153,7 @@ object EnkodPushLibrary {
 
                     this.token = token
 
-                    logInfo( "TokenUpdate")
+                    logInfo( "token updated in library")
 
                     if (!sessionId.isNullOrEmpty()) {
 
@@ -326,7 +327,7 @@ object EnkodPushLibrary {
                 call: Call<UpdateTokenResponse>,
                 response: Response<UpdateTokenResponse>
             ) {
-                logInfo("token updated")
+                logInfo("token updated in service")
                 newTokenCallback(token)
                 startSession()
             }
@@ -346,7 +347,6 @@ object EnkodPushLibrary {
         }
 
         tokenSession?.let {
-            logInfo("on start session \n")
             sessionId?.let { it1 ->
                 retrofit.startSession(it1, getClientName())
                     .enqueue(object : Callback<SessionIdResponse> {

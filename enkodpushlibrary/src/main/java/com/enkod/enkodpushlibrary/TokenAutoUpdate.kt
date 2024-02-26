@@ -8,7 +8,6 @@ import android.app.job.JobService
 import android.content.ComponentName
 import android.content.Context
 import android.os.Build
-import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -224,7 +223,7 @@ internal object TokenAutoUpdate {
                                                 )
                                             }
 
-                                            Log.d("AutoUpdate", "token update in auto update function")
+                                            logInfo( "token update in auto update function")
 
                                         } else {
 

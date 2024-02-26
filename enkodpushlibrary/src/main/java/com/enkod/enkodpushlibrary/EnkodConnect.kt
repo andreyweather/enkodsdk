@@ -93,7 +93,6 @@ class EnkodConnect(
             .apply()
 
 
-
         if (preferencesStartTokenAutoUpdate == null && tokenAutoUpdate) {
 
             preferences.edit()
