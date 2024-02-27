@@ -61,6 +61,8 @@ import com.enkod.enkodpushlibrary.Variables.personId
 import com.enkod.enkodpushlibrary.Variables.soundOn
 import com.enkod.enkodpushlibrary.Variables.title
 import com.enkod.enkodpushlibrary.Variables.vibrationOn
+import com.example.enkodpushlibrary.TokenMismatch
+import com.google.android.gms.tasks.OnCompleteListener
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.RemoteMessage
 import com.google.gson.Gson
@@ -87,7 +89,7 @@ object EnkodPushLibrary {
     internal const val chanelEnkod = "enkod_lib_1"
 
     internal var isOnline = true
-    internal var addContactAccess = false
+
 
     private var account: String? = null
     private var token: String? = null
@@ -156,7 +158,7 @@ object EnkodPushLibrary {
 
                     if (!sessionId.isNullOrEmpty()) {
 
-                        updateToken(sessionId, token)
+                        updateToken(context, sessionId, token)
                     }
                 }
 
@@ -288,9 +290,9 @@ object EnkodPushLibrary {
     }
 
 
-    private fun newSessions(ctx: Context, session: String?) {
+    private fun newSessions(context: Context, session: String?) {
 
-        val preferences = ctx.getSharedPreferences(TAG, Context.MODE_PRIVATE)
+        val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
 
         val newPreferencesToken = preferences.getString(TOKEN_TAG, null)
 
@@ -300,16 +302,17 @@ object EnkodPushLibrary {
 
         this.sessionId = session
 
+
         if (newPreferencesToken.isNullOrEmpty()) {
 
-            subscribeToPush(getClientName(), getSession(), token)
+            startSession()
 
-        } else updateToken(session, newPreferencesToken)
-
+        }
+        else updateToken(context, session, newPreferencesToken)
     }
 
 
-    private fun updateToken(session: String?, token: String?) {
+    private fun updateToken(context: Context, session: String?, token: String?) {
 
         val session = session ?: ""
         val token = token ?: ""
@@ -326,15 +329,114 @@ object EnkodPushLibrary {
                 call: Call<UpdateTokenResponse>,
                 response: Response<UpdateTokenResponse>
             ) {
-                logInfo("token updated in service")
+
+                logInfo("token updated in service ${response.code()}")
                 newTokenCallback(token)
+
+                try {
+
+                    FirebaseMessaging.getInstance().token.addOnCompleteListener(
+
+                        OnCompleteListener { task ->
+
+                            if (!task.isSuccessful) {
+
+                                return@OnCompleteListener
+                            }
+
+                            val currentToken = task.result
+
+                            verificationOfTokenCompliance(
+                                context,
+                                getClientName(),
+                                session,
+                                currentToken
+                            )
+
+                        })
+                } catch (e: Exception) {
+
+                    logInfo("error during token verification: $e")
+                }
+
                 startSession()
+
             }
 
             override fun onFailure(call: Call<UpdateTokenResponse>, t: Throwable) {
+
+
+
                 logInfo("token update failure")
             }
 
+        })
+    }
+
+    internal fun verificationOfTokenCompliance(
+        context: Context,
+        account: String?,
+        session: String?,
+        currentToken: String?
+
+    ) {
+
+        val account = account ?: ""
+        val session = session ?: ""
+
+        retrofit.getToken(
+            account,
+            session
+        ).enqueue(object : Callback<GetTokenResponse> {
+
+            override fun onResponse(
+                call: Call<GetTokenResponse>,
+                response: Response<GetTokenResponse>
+            ) {
+
+                val body = response.body()
+                var tokenOnService = ""
+
+                when (body) {
+
+                    null -> return
+                    else -> {
+
+                        tokenOnService = body.token
+
+
+                        if (tokenOnService == currentToken) {
+
+                            WorkManager.getInstance(context)
+
+                                .cancelUniqueWork("verificationOfTokenWorker")
+
+                           logInfo("token verification true")
+
+
+                        } else {
+
+
+
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+
+                                TokenMismatch.libraryRebootDueToTokenMismatch(context)
+                            }
+
+                            logInfo("token verification false start worker for reload Enkod library")
+
+                        }
+                    }
+                }
+            }
+
+            override fun onFailure(call: Call<GetTokenResponse>, t: Throwable) {
+
+                EnkodPushLibrary.logInfo("token verification error retrofit $t")
+
+                return
+
+            }
         })
     }
 
@@ -389,7 +491,6 @@ object EnkodPushLibrary {
             ) {
                 logInfo("subscribed")
 
-                addContactAccess = true
                 initLibObserver.value = true
 
 
