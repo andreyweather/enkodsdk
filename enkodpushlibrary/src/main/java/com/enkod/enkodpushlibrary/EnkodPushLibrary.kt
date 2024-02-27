@@ -843,7 +843,9 @@ object EnkodPushLibrary {
                     return
                 }
 
-                notify(message[messageId]!!.toInt(), builder.build())
+                val messageID = message[messageId]?.toInt() ?: -1
+
+                notify(messageID, builder.build())
 
                pushLoadObserver.value = true
 

@@ -6,6 +6,7 @@ import androidx.annotation.RequiresApi
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.Worker
@@ -18,7 +19,6 @@ import com.google.android.gms.tasks.OnCompleteListener
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import retrofit2.Call
 import retrofit2.Callback
@@ -28,7 +28,39 @@ import java.util.concurrent.TimeUnit
 internal object TokenVerification {
 
 
-    internal fun verificationOfTokenWorker(context: Context) {
+
+    internal fun startVerificationOfToken (context: Context) {
+
+        EnkodPushLibrary.logInfo("start task token verification ")
+
+
+        val workRequest = OneTimeWorkRequestBuilder<oneTimeWorkerForTokenVerification>()
+
+            .setInitialDelay(1, TimeUnit.HOURS)
+            .build()
+
+        WorkManager
+
+            .getInstance(context)
+            .enqueue(workRequest)
+
+    }
+
+    class oneTimeWorkerForTokenVerification (context: Context, workerParameters: WorkerParameters) :
+
+        Worker(context, workerParameters) {
+
+        @RequiresApi(Build.VERSION_CODES.O)
+        override fun doWork(): Result {
+
+            startPeriodicalWorkerForTokenVerification(applicationContext)
+
+            return Result.success()
+        }
+    }
+
+
+    internal fun startPeriodicalWorkerForTokenVerification(context: Context) {
 
         EnkodPushLibrary.logInfo("start verification function")
 
@@ -81,8 +113,6 @@ internal object TokenVerification {
             CoroutineScope(Dispatchers.IO).launch {
 
                 EnkodPushLibrary.logInfo("verification in process")
-
-                delay(1000)
 
                 EnkodPushLibrary.initPreferences(applicationContext)
                 EnkodPushLibrary.initRetrofit(applicationContext)
@@ -175,7 +205,7 @@ internal object TokenVerification {
 
                             EnkodPushLibrary.init(context, account, currentToken)
 
-                            EnkodPushLibrary.logInfo("token verification false")
+                            EnkodPushLibrary.logInfo("token verification false reload Enkod library")
 
                         }
                     }

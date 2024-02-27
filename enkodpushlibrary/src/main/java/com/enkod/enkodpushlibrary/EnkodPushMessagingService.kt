@@ -1,5 +1,6 @@
 package com.enkod.enkodpushlibrary
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Build
 import android.util.Log
@@ -33,6 +34,7 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
     }
 
 
+    @SuppressLint("SwitchIntDef")
     override fun onMessageReceived(message: RemoteMessage) {
 
         Log.d("onMessageReceived", message.toString())
@@ -71,7 +73,14 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
                     this.startForegroundService(service)
 
                 } else if (Build.VERSION.SDK_INT >= 31) {
-                    showPushWorkManager()
+
+                    when (message.priority) {
+
+                        1 -> managingTheNotificationCreationProcess(applicationContext, dataFromPush)
+                        2 -> showPushWorkManager()
+                        0 -> showPushWorkManager()
+
+                    }
                 }
             }
         }
@@ -85,8 +94,10 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
             .putString(MESSAGEID_TAG, "${dataFromPush[messageId]}")
             .apply()
 
-        managingTheNotificationCreationProcess (applicationContext, dataFromPush)
 
+        if (Build.VERSION.SDK_INT < 31) {
+            managingTheNotificationCreationProcess(applicationContext, dataFromPush)
+        }
     }
 }
 

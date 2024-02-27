@@ -9,7 +9,7 @@ import android.os.IBinder
 import com.enkod.enkodpushlibrary.EnkodPushLibrary.logInfo
 import com.enkod.enkodpushlibrary.Preferences.ACCOUNT_TAG
 import com.enkod.enkodpushlibrary.Preferences.TAG
-import com.example.enkodpushlibrary.TokenVerification.verificationOfTokenWorker
+import com.example.enkodpushlibrary.TokenVerification.startVerificationOfToken
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -70,9 +70,7 @@ class TokenManualUpdateService : Service() {
 
                                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
 
-                                            verificationOfTokenWorker(
-                                                applicationContext
-                                            )
+                                            startVerificationOfToken(applicationContext)
                                         }
 
                                         CoroutineScope(Dispatchers.IO).launch {
