@@ -4,8 +4,9 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Build
 import android.util.Log
+import androidx.work.Constraints
+import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
 import com.enkod.enkodpushlibrary.EnkodPushLibrary.creatureInputDataFromMessage
 import com.enkod.enkodpushlibrary.EnkodPushLibrary.isAppInforegrounded
@@ -48,12 +49,15 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
 
         fun showPushWorkManager() {
 
-            Log.d("onMessageReceived", "showPushWorkManager")
+            logInfo( "show push with expedition work manager")
+            val constraint =
+                Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
 
             val workRequest = OneTimeWorkRequestBuilder<LoadImageWorker>()
 
-                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                //.setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                 .setInputData(creatureInputDataFromMessage(message))
+                .setConstraints(constraint)
                 .build()
 
             WorkManager

@@ -24,7 +24,6 @@ import com.enkod.enkodpushlibrary.EnkodPushLibrary.startTokenAutoUpdateObserver
 import com.enkod.enkodpushlibrary.Preferences.TAG
 import com.enkod.enkodpushlibrary.Variables.defaultTimeAutoUpdateToken
 import com.enkod.enkodpushlibrary.Variables.millisInHours
-import com.example.enkodpushlibrary.TokenVerification
 import com.google.firebase.messaging.FirebaseMessaging
 import java.util.concurrent.TimeUnit
 
@@ -215,13 +214,6 @@ internal object TokenAutoUpdate {
                                                 preferencesAcc,
                                                 token
                                             )
-
-                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-
-                                                TokenVerification.startVerificationOfToken(
-                                                    context
-                                                )
-                                            }
 
                                             logInfo( "token update in auto update function")
 
