@@ -10,16 +10,12 @@ import com.enkod.enkodpushlibrary.Preferences.LOAD_TIMEOUT_TAG
 import com.enkod.enkodpushlibrary.Preferences.START_AUTO_UPDATE_TAG
 import com.enkod.enkodpushlibrary.Preferences.TAG
 import com.enkod.enkodpushlibrary.Preferences.TIME_LAST_TOKEN_UPDATE_TAG
-import com.enkod.enkodpushlibrary.Preferences.TIME_TOKEN_AUTO_UPDATE_TAG
 import com.enkod.enkodpushlibrary.Preferences.TIME_VERIFICATION_TAG
-import com.enkod.enkodpushlibrary.TokenAutoUpdate.startAutoUpdatesUsingJobScheduler
-import com.enkod.enkodpushlibrary.TokenAutoUpdate.startAutoUpdatesUsingWorkManager
 import com.enkod.enkodpushlibrary.Variables.defaultImageLoadTimeout
 import com.enkod.enkodpushlibrary.Variables.defaultTimeAutoUpdateToken
 import com.enkod.enkodpushlibrary.Variables.defaultTimeManualUpdateToken
 import com.enkod.enkodpushlibrary.Variables.defaultTimeVerificationToken
 import com.enkod.enkodpushlibrary.Variables.millisInHours
-import com.enkod.enkodpushlibrary.Variables.start
 import com.google.android.gms.tasks.OnCompleteListener
 import com.google.firebase.messaging.FirebaseMessaging
 
@@ -93,33 +89,6 @@ class EnkodConnect(
             .apply()
 
 
-        if (preferencesStartTokenAutoUpdate == null && tokenAutoUpdate) {
-
-            preferences.edit()
-
-                .putInt(TIME_TOKEN_AUTO_UPDATE_TAG, timeTokenAutoUpdate)
-                .apply()
-
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-
-                startAutoUpdatesUsingWorkManager(context, timeTokenAutoUpdate)
-
-            } else {
-
-                startAutoUpdatesUsingJobScheduler(context, timeTokenAutoUpdate)
-
-            }
-
-            preferences.edit()
-
-                .putString(START_AUTO_UPDATE_TAG, start)
-                .apply()
-
-        }
-
-
-
         if (EnkodPushLibrary.isOnline(context)) {
 
             EnkodPushLibrary.isOnlineStatus(true)
@@ -135,6 +104,42 @@ class EnkodConnect(
                     val token = task.result
 
                     logInfo("start library with fcm")
+
+                    if (preferencesStartTokenAutoUpdate == null && tokenAutoUpdate) {
+
+                        preferences.edit()
+
+                            .putInt(Preferences.TIME_TOKEN_AUTO_UPDATE_TAG, timeTokenAutoUpdate)
+                            .apply()
+
+
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+
+                            TokenAutoUpdate.startTokenAutoUpdateUsingWorkManager(
+                                context,
+                                timeTokenAutoUpdate
+                            )
+
+                        } else {
+
+                            TokenAutoUpdate.startAutoUpdatesUsingJobScheduler(
+                                context,
+                                timeTokenAutoUpdate
+                            )
+
+                        }
+
+                        preferences.edit()
+
+                            .putString(START_AUTO_UPDATE_TAG, Variables.start)
+                            .apply()
+                    }
+
+                    if (tokenManualUpdate) {
+
+                        tokenUpdate(context, timeTokenManualUpdate)
+
+                    }
 
                     EnkodPushLibrary.init(context, account, token)
 
@@ -155,12 +160,6 @@ class EnkodConnect(
             logInfo("error internet")
         }
 
-
-        if (tokenManualUpdate) {
-
-            tokenUpdate(context, timeTokenManualUpdate)
-
-        }
     }
 
 

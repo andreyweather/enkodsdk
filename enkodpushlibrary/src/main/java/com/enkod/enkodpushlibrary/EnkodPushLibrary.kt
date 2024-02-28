@@ -61,8 +61,6 @@ import com.enkod.enkodpushlibrary.Variables.personId
 import com.enkod.enkodpushlibrary.Variables.soundOn
 import com.enkod.enkodpushlibrary.Variables.title
 import com.enkod.enkodpushlibrary.Variables.vibrationOn
-import com.example.enkodpushlibrary.TokenMismatch
-import com.google.android.gms.tasks.OnCompleteListener
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.RemoteMessage
 import com.google.gson.Gson
@@ -148,9 +146,6 @@ object EnkodPushLibrary {
                         .putString(TOKEN_TAG, token)
                         .apply()
 
-                    preferences.edit()
-                        .putLong (TIME_LAST_TOKEN_UPDATE_TAG, System.currentTimeMillis())
-                        .apply()
 
                     this.token = token
 
@@ -330,34 +325,14 @@ object EnkodPushLibrary {
                 response: Response<UpdateTokenResponse>
             ) {
 
-                logInfo("token updated in service ${response.code()}")
+                logInfo("token updated in service code: ${response.code()}")
                 newTokenCallback(token)
 
-                try {
+                val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
 
-                    FirebaseMessaging.getInstance().token.addOnCompleteListener(
-
-                        OnCompleteListener { task ->
-
-                            if (!task.isSuccessful) {
-
-                                return@OnCompleteListener
-                            }
-
-                            val currentToken = task.result
-
-                            verificationOfTokenCompliance(
-                                context,
-                                getClientName(),
-                                session,
-                                currentToken
-                            )
-
-                        })
-                } catch (e: Exception) {
-
-                    logInfo("error during token verification: $e")
-                }
+                preferences.edit()
+                    .putLong (TIME_LAST_TOKEN_UPDATE_TAG, System.currentTimeMillis())
+                    .apply()
 
                 startSession()
 
@@ -366,79 +341,13 @@ object EnkodPushLibrary {
             override fun onFailure(call: Call<UpdateTokenResponse>, t: Throwable) {
 
 
-
                 logInfo("token update failure")
             }
 
         })
     }
 
-    internal fun verificationOfTokenCompliance(
-        context: Context,
-        account: String?,
-        session: String?,
-        currentToken: String?
 
-    ) {
-
-        val account = account ?: ""
-        val session = session ?: ""
-
-        retrofit.getToken(
-            account,
-            session
-        ).enqueue(object : Callback<GetTokenResponse> {
-
-            override fun onResponse(
-                call: Call<GetTokenResponse>,
-                response: Response<GetTokenResponse>
-            ) {
-
-                val body = response.body()
-                var tokenOnService = ""
-
-                when (body) {
-
-                    null -> return
-                    else -> {
-
-                        tokenOnService = body.token
-
-
-                        if (tokenOnService == currentToken) {
-
-                            WorkManager.getInstance(context)
-
-                                .cancelUniqueWork("verificationOfTokenWorker")
-
-                           logInfo("token verification true")
-
-
-                        } else {
-
-
-
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-
-                                TokenMismatch.libraryRebootDueToTokenMismatch(context)
-                            }
-
-                            logInfo("token verification false start worker for reload Enkod library")
-
-                        }
-                    }
-                }
-            }
-
-            override fun onFailure(call: Call<GetTokenResponse>, t: Throwable) {
-
-                EnkodPushLibrary.logInfo("token verification error retrofit $t")
-
-                return
-
-            }
-        })
-    }
 
     private fun startSession() {
 
@@ -492,7 +401,6 @@ object EnkodPushLibrary {
                 logInfo("subscribed")
 
                 initLibObserver.value = true
-
 
             }
 
@@ -722,7 +630,11 @@ object EnkodPushLibrary {
         when (scheduler){
 
             null -> return
-            else -> scheduler.cancel(1)
+            else -> {
+
+                scheduler.cancel(1)
+                scheduler.cancel(2)
+            }
         }
 
         initLibObserver.value = false
@@ -732,7 +644,7 @@ object EnkodPushLibrary {
     }
 
     internal fun logInfo(msg: String) {
-        Log.d("enkodLibrary", "${msg}")
+        Log.d("enkodLibrary", msg)
         Log.i(TAG, msg)
     }
 

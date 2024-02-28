@@ -9,6 +9,7 @@ import android.os.IBinder
 import com.enkod.enkodpushlibrary.EnkodPushLibrary.logInfo
 import com.enkod.enkodpushlibrary.Preferences.ACCOUNT_TAG
 import com.enkod.enkodpushlibrary.Preferences.TAG
+import com.enkod.enkodpushlibrary.VerificationOfTokenCompliance.startVerificationTokenUsingWorkManager
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -67,6 +68,16 @@ class TokenManualUpdateService : Service() {
                                         )
                                         logInfo ("token manual update" )
 
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+
+                                            startVerificationTokenUsingWorkManager(applicationContext)
+                                        }
+                                        else {
+                                            VerificationOfTokenCompliance.startVerificationTokenUsingJobScheduler(
+                                                applicationContext
+                                            )
+                                        }
+
                                         CoroutineScope(Dispatchers.IO).launch {
 
                                             delay(5000)
@@ -76,6 +87,16 @@ class TokenManualUpdateService : Service() {
 
                                     } else {
 
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+
+                                            startVerificationTokenUsingWorkManager(applicationContext)
+                                        }
+                                        else {
+                                            VerificationOfTokenCompliance.startVerificationTokenUsingJobScheduler(
+                                                applicationContext
+                                            )
+                                        }
+
                                         logInfo("error get new token in UpdateTokenService")
 
                                         stopSelf()
@@ -83,6 +104,16 @@ class TokenManualUpdateService : Service() {
                                 }
 
                             } else {
+
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+
+                                    startVerificationTokenUsingWorkManager(applicationContext)
+                                }
+                                else {
+                                    VerificationOfTokenCompliance.startVerificationTokenUsingJobScheduler(
+                                        applicationContext
+                                    )
+                                }
 
                                 logInfo("error deletion token in UpdateTokenService")
 
@@ -92,6 +123,15 @@ class TokenManualUpdateService : Service() {
 
                 } catch (e: Exception) {
 
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+
+                        startVerificationTokenUsingWorkManager(applicationContext)
+                    }
+                    else {
+                        VerificationOfTokenCompliance.startVerificationTokenUsingJobScheduler(
+                            applicationContext
+                        )
+                    }
                     logInfo("error in UpdateTokenService $e")
 
                     stopSelf()

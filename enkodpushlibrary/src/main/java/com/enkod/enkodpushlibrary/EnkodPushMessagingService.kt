@@ -7,6 +7,7 @@ import android.util.Log
 import androidx.work.Constraints
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
 import com.enkod.enkodpushlibrary.EnkodPushLibrary.creatureInputDataFromMessage
 import com.enkod.enkodpushlibrary.EnkodPushLibrary.isAppInforegrounded
@@ -55,7 +56,7 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
 
             val workRequest = OneTimeWorkRequestBuilder<LoadImageWorker>()
 
-                //.setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                 .setInputData(creatureInputDataFromMessage(message))
                 .setConstraints(constraint)
                 .build()
@@ -82,7 +83,7 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
 
                         1 -> managingTheNotificationCreationProcess(applicationContext, dataFromPush)
                         2 -> showPushWorkManager()
-                        0 -> showPushWorkManager()
+                        else -> showPushWorkManager()
 
                     }
                 }
