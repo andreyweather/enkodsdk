@@ -25,15 +25,12 @@
             android:directBootAware = "true"
             />
 
-        <service android:name="com.enkod.enkodpushlibrary.TokenAutoUpdate$TokenAutoUpdateJobService"
-            android:permission="android.permission.BIND_JOB_SERVICE" >
-
-        </service>
 
         <service
             android:name="com.enkod.enkodpushlibrary.InternetService"
             android:enabled="true"
             android:exported="true" />
+
 
         <activity
             android:name="com.enkod.enkodpushlibrary.OnOpenActivity"

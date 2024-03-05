@@ -14,7 +14,7 @@ object Tracking {
     private var onErrorCallback: (String) -> Unit = {}
 
 
-    fun createHistoryJsonForCartAndFavourite (product: Product): JsonObject {
+    private fun createHistoryJsonForCartAndFavourite (product: Product): JsonObject {
 
         val history = JsonObject()
 
@@ -107,7 +107,7 @@ object Tracking {
                             call: Call<Unit>,
                             response: Response<Unit>
                         ) {
-                            val msg = "success"
+                            val msg = "add to cart success"
                             EnkodPushLibrary.logInfo(msg)
                             onProductActionCallback(msg)
 
@@ -163,7 +163,7 @@ object Tracking {
                             call: Call<Unit>,
                             response: Response<Unit>
                         ) {
-                            val msg = "success"
+                            val msg = "remove from cart success"
                             EnkodPushLibrary.logInfo(msg)
                             onProductActionCallback(msg)
 
@@ -221,8 +221,8 @@ object Tracking {
                             call: Call<Unit>,
                             response: Response<Unit>
                         ) {
-                            Log.d("Favourite", "success")
-                            val msg = "success"
+
+                            val msg = "add to favourite success"
                             EnkodPushLibrary.logInfo(msg)
                             onProductActionCallback(msg)
 
@@ -282,7 +282,7 @@ object Tracking {
                             call: Call<Unit>,
                             response: Response<Unit>
                         ) {
-                            val msg = "success"
+                            val msg = "remove from favourite success"
                             EnkodPushLibrary.logInfo(msg)
                             onProductActionCallback(msg)
 

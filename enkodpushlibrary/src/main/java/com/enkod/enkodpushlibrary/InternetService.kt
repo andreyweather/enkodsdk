@@ -1,16 +1,14 @@
 package com.enkod.enkodpushlibrary
 
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import androidx.annotation.RequiresApi
-import com.enkod.enkodpushlibrary.EnkodPushLibrary.createdNotificationForNetworkService
+import com.enkod.enkodpushlibrary.EnkodPushLibrary.createdNotificationForService
 import com.enkod.enkodpushlibrary.EnkodPushLibrary.logInfo
-import com.enkod.enkodpushlibrary.Preferences.LOAD_TIMEOUT_TAG
-import com.enkod.enkodpushlibrary.Preferences.TAG
+import com.enkod.enkodpushlibrary.Variables.defaultImageLoadTimeout
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -81,35 +79,24 @@ class InternetService : Service() {
 
            logInfo("startSelf")
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 if (Build.VERSION.SDK_INT >= 34) {
                     startForeground(
                         1,
-                        createdNotificationForNetworkService(applicationContext),
+                        createdNotificationForService(applicationContext),
                         ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
                     )
                 }else {
 
-                    startForeground(1, createdNotificationForNetworkService(applicationContext))
+                    startForeground(1, createdNotificationForService(applicationContext))
                 }
             }
         }
 
         CoroutineScope(Dispatchers.IO).launch {
 
-            val preferences = applicationContext.getSharedPreferences(TAG, Context.MODE_PRIVATE)
-            val preferencesStartTimer = preferences.getInt(LOAD_TIMEOUT_TAG, 15000)
-
-           when (preferencesStartTimer) {
-               null -> {
-                   delay(15000)
+                   delay(defaultImageLoadTimeout.toLong())
                    stopSelf()
-               }
-               else -> {
-                   delay(preferencesStartTimer.toLong())
-                   stopSelf()
-               }
-           }
         }
     }
 

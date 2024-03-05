@@ -1,10 +1,5 @@
 package com.enkod.enkodpushlibrary
 
-import android.app.job.JobInfo
-import android.app.job.JobParameters
-import android.app.job.JobScheduler
-import android.app.job.JobService
-import android.content.ComponentName
 import android.content.Context
 import android.os.Build
 import androidx.annotation.RequiresApi
@@ -16,7 +11,6 @@ import androidx.work.WorkManager
 import androidx.work.Worker
 import androidx.work.WorkerParameters
 import com.enkod.enkodpushlibrary.Variables.defaultTimeVerificationToken
-import com.enkod.enkodpushlibrary.Variables.millisInHours
 import com.google.android.gms.tasks.OnCompleteListener
 import com.google.firebase.messaging.FirebaseMessaging
 import retrofit2.Call
@@ -31,24 +25,13 @@ internal object VerificationOfTokenCompliance {
 
         EnkodPushLibrary.logInfo("start verification function using workManager")
 
-        val preferences = context.getSharedPreferences(Preferences.TAG, Context.MODE_PRIVATE)
-
-        val preferencesTimeVerification: Int? =
-            preferences.getInt(
-                Preferences.TIME_VERIFICATION_TAG,
-                Variables.defaultTimeVerificationToken
-            )
-
-        val time = preferencesTimeVerification ?: Variables.defaultTimeVerificationToken
-
-
         val constraint =
             Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
 
         val workRequest =
 
             PeriodicWorkRequestBuilder<verificationOfTokenWorkManager>(
-                time.toLong(),
+                defaultTimeVerificationToken.toLong(),
                 TimeUnit.HOURS
             )
                 .setInitialDelay(1, TimeUnit.MINUTES)
@@ -89,92 +72,6 @@ internal object VerificationOfTokenCompliance {
     }
 
 
-    internal fun startVerificationTokenUsingJobScheduler (context: Context) {
-
-
-        val jobInfo = JobInfo.Builder(2, ComponentName(context, StartTokenVerificationJobService::class.java))
-            .setPersisted(true)
-            .setMinimumLatency(60000)
-            .build()
-        val jobScheduler = context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
-        jobScheduler.schedule(jobInfo)
-    }
-
-
-    class StartTokenVerificationJobService : JobService() {
-        override fun onStartJob(params: JobParameters): Boolean {
-
-            EnkodPushLibrary.logInfo("token start verification JobScheduler onStart")
-
-            doBackgroundWork(params)
-
-            return true
-        }
-
-        private fun doBackgroundWork(params: JobParameters) {
-
-            verificationTokenUsingJobScheduler(applicationContext)
-
-            jobFinished(params, true)
-
-        }
-
-        override fun onStopJob(params: JobParameters): Boolean {
-
-            EnkodPushLibrary.logInfo("token start  verification JobScheduler onStop")
-
-            return true
-        }
-    }
-
-    internal fun verificationTokenUsingJobScheduler (context: Context) {
-
-        val preferences = context.getSharedPreferences(Preferences.TAG, Context.MODE_PRIVATE)
-
-        val preferencesTimeVerification: Int? =
-            preferences.getInt(
-                Preferences.TIME_VERIFICATION_TAG,
-                defaultTimeVerificationToken
-            )
-
-        val time = preferencesTimeVerification ?: defaultTimeVerificationToken
-        val timeInMillis = time * millisInHours
-
-        val jobInfo = JobInfo.Builder(2, ComponentName(context, TokenVerificationJobService::class.java))
-            .setPersisted(true)
-            .setPeriodic(timeInMillis.toLong())
-            .build()
-        val jobScheduler = context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
-        jobScheduler.schedule(jobInfo)
-    }
-
-
-    class TokenVerificationJobService : JobService() {
-        override fun onStartJob(params: JobParameters): Boolean {
-
-            EnkodPushLibrary.logInfo("token verification JobScheduler onStart")
-
-            doBackgroundWork(params)
-
-            return true
-        }
-
-        private fun doBackgroundWork(params: JobParameters) {
-
-
-            preparationVerification(applicationContext)
-
-            jobFinished(params, true)
-
-        }
-
-        override fun onStopJob(params: JobParameters): Boolean {
-
-            EnkodPushLibrary.logInfo("token verification JobScheduler onStop")
-
-            return true
-        }
-    }
 
 
     fun preparationVerification (context: Context) {
@@ -254,24 +151,12 @@ internal object VerificationOfTokenCompliance {
 
                         if (tokenOnService == currentToken) {
 
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+
                             WorkManager.getInstance(context)
                                 .cancelUniqueWork("verificationOfTokenWorker")
 
-                            }else {
-
-                                val scheduler = context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler?
-
-                                when (scheduler){
-
-                                    null -> return
-                                    else -> scheduler.cancel(2)
-                                }
-
-                            }
 
                             EnkodPushLibrary.logInfo("token verification true")
-
 
                         } else {
 

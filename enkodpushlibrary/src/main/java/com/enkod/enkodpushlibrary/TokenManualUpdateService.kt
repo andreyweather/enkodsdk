@@ -25,12 +25,12 @@ class TokenManualUpdateService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
                 1,
-                EnkodPushLibrary.createdNotificationForNetworkService(this),
+                EnkodPushLibrary.createdNotificationForService(this),
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
             )
         } else {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForeground(1, EnkodPushLibrary.createdNotificationForNetworkService(this))
+                startForeground(1, EnkodPushLibrary.createdNotificationForService(this))
             }
         }
 
@@ -68,15 +68,9 @@ class TokenManualUpdateService : Service() {
                                         )
                                         logInfo ("token manual update" )
 
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
 
                                             startVerificationTokenUsingWorkManager(applicationContext)
-                                        }
-                                        else {
-                                            VerificationOfTokenCompliance.startVerificationTokenUsingJobScheduler(
-                                                applicationContext
-                                            )
-                                        }
+
 
                                         CoroutineScope(Dispatchers.IO).launch {
 
@@ -87,15 +81,7 @@ class TokenManualUpdateService : Service() {
 
                                     } else {
 
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-
                                             startVerificationTokenUsingWorkManager(applicationContext)
-                                        }
-                                        else {
-                                            VerificationOfTokenCompliance.startVerificationTokenUsingJobScheduler(
-                                                applicationContext
-                                            )
-                                        }
 
                                         logInfo("error get new token in UpdateTokenService")
 
@@ -105,15 +91,8 @@ class TokenManualUpdateService : Service() {
 
                             } else {
 
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-
                                     startVerificationTokenUsingWorkManager(applicationContext)
-                                }
-                                else {
-                                    VerificationOfTokenCompliance.startVerificationTokenUsingJobScheduler(
-                                        applicationContext
-                                    )
-                                }
+
 
                                 logInfo("error deletion token in UpdateTokenService")
 
@@ -123,15 +102,8 @@ class TokenManualUpdateService : Service() {
 
                 } catch (e: Exception) {
 
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-
                         startVerificationTokenUsingWorkManager(applicationContext)
-                    }
-                    else {
-                        VerificationOfTokenCompliance.startVerificationTokenUsingJobScheduler(
-                            applicationContext
-                        )
-                    }
+
                     logInfo("error in UpdateTokenService $e")
 
                     stopSelf()

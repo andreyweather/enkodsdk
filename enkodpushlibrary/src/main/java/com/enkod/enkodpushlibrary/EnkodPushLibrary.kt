@@ -9,9 +9,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.app.job.JobScheduler
 import android.content.Context
-import android.content.Context.JOB_SCHEDULER_SERVICE
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -32,26 +30,26 @@ import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.os.bundleOf
+import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.WorkManager
-import androidx.work.Worker
 import androidx.work.WorkerParameters
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.model.GlideUrl
 import com.bumptech.glide.load.model.LazyHeaders
 import com.bumptech.glide.request.target.CustomTarget
 import com.bumptech.glide.request.transition.Transition
+import com.enkod.enkodpushlibrary.EnkodPushLibrary.logInfo
 import com.enkod.enkodpushlibrary.Preferences.ACCOUNT_TAG
 import com.enkod.enkodpushlibrary.Preferences.DEV_TAG
-import com.enkod.enkodpushlibrary.Preferences.LOAD_TIMEOUT_TAG
 import com.enkod.enkodpushlibrary.Preferences.MESSAGEID_TAG
 import com.enkod.enkodpushlibrary.Preferences.SESSION_ID_TAG
 import com.enkod.enkodpushlibrary.Preferences.START_AUTO_UPDATE_TAG
 import com.enkod.enkodpushlibrary.Preferences.TAG
 import com.enkod.enkodpushlibrary.Preferences.TIME_LAST_TOKEN_UPDATE_TAG
 import com.enkod.enkodpushlibrary.Preferences.TIME_TOKEN_AUTO_UPDATE_TAG
-import com.enkod.enkodpushlibrary.Preferences.TIME_VERIFICATION_TAG
 import com.enkod.enkodpushlibrary.Preferences.TOKEN_TAG
+import com.enkod.enkodpushlibrary.Preferences.USING_FCM
 import com.enkod.enkodpushlibrary.Variables.body
 import com.enkod.enkodpushlibrary.Variables.ledColor
 import com.enkod.enkodpushlibrary.Variables.ledOffMs
@@ -102,7 +100,7 @@ object EnkodPushLibrary {
     internal val initLibObserver = InitLibObserver(false)
     internal val pushLoadObserver = PushLoadObserver(false)
     internal val startTokenAutoUpdateObserver = StartTokenAutoUpdateObserver(false)
-
+    internal val startTokenManualUpdateObserver = StartTokenManualUpdateObserver(false)
 
     private var onPushClickCallback: (Bundle, String) -> Unit = { _, _ -> }
     private var onDynamicLinkClick: ((String) -> Unit)? = null
@@ -149,7 +147,7 @@ object EnkodPushLibrary {
 
                     this.token = token
 
-                    logInfo( "token updated in library")
+                    logInfo("token updated in library")
 
                     if (!sessionId.isNullOrEmpty()) {
 
@@ -254,20 +252,28 @@ object EnkodPushLibrary {
 
                     newSessions(context, it)
 
-                    logInfo("created_newSession")
+                    logInfo("created new session")
 
                     when (dev(context)) {
                         null -> return
-                        else ->  Toast.makeText(context, "connect_getSessionIdFromApi", Toast.LENGTH_LONG).show()
+                        else -> Toast.makeText(
+                            context,
+                            "connect_getSessionIdFromApi",
+                            Toast.LENGTH_LONG
+                        ).show()
                     }
 
                 } ?: run {
 
-                    logInfo("error_created_newSession")
+                    logInfo("error created new session")
 
                     when (dev(context)) {
                         null -> return
-                        else ->  Toast.makeText(context, "error_getSessionIdFromApi", Toast.LENGTH_LONG).show()
+                        else -> Toast.makeText(
+                            context,
+                            "error_getSessionIdFromApi",
+                            Toast.LENGTH_LONG
+                        ).show()
                     }
                 }
             }
@@ -278,7 +284,7 @@ object EnkodPushLibrary {
 
                 when (dev(context)) {
                     null -> return
-                    else ->  Toast.makeText(context, "error: ${t.message}", Toast.LENGTH_LONG).show()
+                    else -> Toast.makeText(context, "error: ${t.message}", Toast.LENGTH_LONG).show()
                 }
             }
         })
@@ -299,11 +305,8 @@ object EnkodPushLibrary {
 
 
         if (newPreferencesToken.isNullOrEmpty()) {
-
             startSession()
-
-        }
-        else updateToken(context, session, newPreferencesToken)
+        } else updateToken(context, session, newPreferencesToken)
     }
 
 
@@ -331,7 +334,7 @@ object EnkodPushLibrary {
                 val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
 
                 preferences.edit()
-                    .putLong (TIME_LAST_TOKEN_UPDATE_TAG, System.currentTimeMillis())
+                    .putLong(TIME_LAST_TOKEN_UPDATE_TAG, System.currentTimeMillis())
                     .apply()
 
                 startSession()
@@ -348,42 +351,29 @@ object EnkodPushLibrary {
     }
 
 
-
     private fun startSession() {
 
-        var tokenSession = ""
-        if (!this.token.isNullOrEmpty()) {
-            tokenSession = this.token!!
-        }
+        retrofit.startSession(getSession(), getClientName())
+            .enqueue(object : Callback<SessionIdResponse> {
+                override fun onResponse(
+                    call: Call<SessionIdResponse>,
+                    response: Response<SessionIdResponse>
+                ) {
+                    logInfo("session started ${response.body()?.session_id}")
 
-        tokenSession?.let {
-            sessionId?.let { it1 ->
-                retrofit.startSession(it1, getClientName())
-                    .enqueue(object : Callback<SessionIdResponse> {
-                        override fun onResponse(
-                            call: Call<SessionIdResponse>,
-                            response: Response<SessionIdResponse>
-                        ) {
-                            logInfo("session started ${response.body()?.session_id}")
-                            newTokenCallback(it)
-                            subscribeToPush(getClientName(), getSession(), token)
-                        }
+                    subscribeToPush(getClientName(), getSession(), getToken())
+                }
 
-                        override fun onFailure(call: Call<SessionIdResponse>, t: Throwable) {
-                            logInfo("session not started ${t.message}")
-                            newTokenCallback(it)
-                        }
-                    })
-            }
-        }
+                override fun onFailure(call: Call<SessionIdResponse>, t: Throwable) {
+                    logInfo("session not started ${t.message}")
+
+                }
+            })
+
     }
 
 
-    private fun subscribeToPush(client: String?, session: String?, token: String?) {
-
-        val client = client ?: ""
-        val session = session ?: ""
-        val token = token ?: ""
+    private fun subscribeToPush(client: String, session: String, token: String) {
 
         retrofit.subscribeToPushToken(
             client,
@@ -416,7 +406,6 @@ object EnkodPushLibrary {
 
         email: String = "",
         phone: String = "",
-        source: String = "mobile",
 
         params: Map<String, String>? = null
 
@@ -424,11 +413,11 @@ object EnkodPushLibrary {
 
         initLibObserver.observable.subscribe {
 
-            Log.d ("observable", "ok")
+            Log.d("observable", "ok")
 
             if (it) {
 
-                Log.d ("observable", "in contact")
+                Log.d("observable", "in contact")
 
                 if (isOnline) {
 
@@ -444,7 +433,6 @@ object EnkodPushLibrary {
 
 
                     val fileds = JsonObject()
-
 
                     if (!params.isNullOrEmpty()) {
 
@@ -466,6 +454,8 @@ object EnkodPushLibrary {
                     if (!phone.isNullOrEmpty()) {
                         fileds.addProperty("phone", phone)
                     }
+
+                    val source = "mobile"
 
                     req.addProperty("source", source)
 
@@ -499,7 +489,7 @@ object EnkodPushLibrary {
         }
     }
 
-    fun updateContacts (email: String, phone: String) {
+    fun updateContacts(email: String, phone: String) {
         val params = hashMapOf<String, String>()
         if (email.isNotEmpty()) {
             params.put("email", email)
@@ -514,7 +504,7 @@ object EnkodPushLibrary {
             params
         ).enqueue(object : Callback<Unit> {
             override fun onResponse(call: Call<Unit>, response: Response<Unit>) {
-
+                logInfo("successful manual updating contact")
             }
 
             override fun onFailure(call: Call<Unit>, t: Throwable) {
@@ -564,23 +554,29 @@ object EnkodPushLibrary {
             .apply()
     }
 
-     private fun dev (context: Context): String? {
-         val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
-         val devUrl = preferences.getString(DEV_TAG, null)
-         return devUrl
-     }
+    private fun dev(context: Context): String? {
+        val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
+        val devUrl = preferences.getString(DEV_TAG, null)
+        return devUrl
+    }
 
     internal fun getClientName(): String {
 
         return if (!this.account.isNullOrEmpty()) {
-            this.account!!
+            this.account ?: ""
         } else ""
     }
 
-     internal fun getSession(): String {
+    internal fun getSession(): String {
 
         return if (!this.sessionId.isNullOrEmpty()) {
-            this.sessionId!!
+            this.sessionId ?: ""
+        } else ""
+    }
+
+    internal fun getToken(): String {
+        return if (!this.token.isNullOrEmpty()) {
+            this.token ?: ""
         } else ""
     }
 
@@ -603,9 +599,16 @@ object EnkodPushLibrary {
 
     fun logOut(context: Context) {
 
-        FirebaseMessaging.getInstance().deleteToken()
-
         val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
+
+        val preferencesUsingFcm: Boolean? =
+            preferences.getBoolean(USING_FCM, false)
+
+        if (preferencesUsingFcm != null && preferencesUsingFcm == true) {
+
+            FirebaseMessaging.getInstance().deleteToken()
+
+        }
 
         preferences.edit().remove(SESSION_ID_TAG).apply()
         sessionId = ""
@@ -614,30 +617,18 @@ object EnkodPushLibrary {
         preferences.edit().remove(TOKEN_TAG).apply()
         token = ""
 
-
-        preferences.edit().remove(TIME_VERIFICATION_TAG).apply()
-        preferences.edit().remove(DEV_TAG).apply()
-        preferences.edit().remove(LOAD_TIMEOUT_TAG).apply()
+        preferences.edit().remove(USING_FCM).apply()
         preferences.edit().remove(TIME_LAST_TOKEN_UPDATE_TAG).apply()
         preferences.edit().remove(START_AUTO_UPDATE_TAG).apply()
         preferences.edit().remove(TIME_TOKEN_AUTO_UPDATE_TAG).apply()
+        preferences.edit().remove(DEV_TAG).apply()
 
         WorkManager.getInstance(context).cancelUniqueWork("verificationOfTokenWorker")
         WorkManager.getInstance(context).cancelUniqueWork("tokenAutoUpdateWorker")
 
-        val scheduler = context.getSystemService(JOB_SCHEDULER_SERVICE) as JobScheduler?
-
-        when (scheduler){
-
-            null -> return
-            else -> {
-
-                scheduler.cancel(1)
-                scheduler.cancel(2)
-            }
-        }
-
         initLibObserver.value = false
+        startTokenAutoUpdateObserver.value = false
+        startTokenManualUpdateObserver.value = false
 
         logInfo("logOut")
 
@@ -648,13 +639,13 @@ object EnkodPushLibrary {
         Log.i(TAG, msg)
     }
 
-    fun creatureInputDataFromMessage (message: RemoteMessage): Data {
+    internal fun creatureInputDataFromMessage(message: RemoteMessage): Data {
 
         val dataBuilder = Data.Builder()
 
         for (key in message.data.keys) {
 
-            if (!message.data[key].isNullOrEmpty())  {
+            if (!message.data[key].isNullOrEmpty()) {
                 dataBuilder.putString(key, message.data[key])
             }
         }
@@ -665,7 +656,7 @@ object EnkodPushLibrary {
     }
 
 
-    fun loadImageFromUrl(context: Context, url: String): Single<Bitmap> {
+    private fun loadImageFromUrl(context: Context, url: String): Single<Bitmap> {
 
         val userAgent = when (val agent: String? = System.getProperty("http.agent")) {
             null -> "android"
@@ -706,33 +697,32 @@ object EnkodPushLibrary {
     }
 
     @SuppressLint("CheckResult")
-    fun managingTheNotificationCreationProcess (context: Context, message: Map <String,String>) {
+    fun managingTheNotificationCreationProcess(context: Context, message: Map<String, String>) {
 
         if (!message[Variables.imageUrl].isNullOrEmpty()) {
 
             loadImageFromUrl(context, message[Variables.imageUrl]!!).subscribe(
 
-                {
-                        bitmap ->
-                    logInfo("onMessageReceived successful image upload")
+                { bitmap ->
+                    logInfo("successful upload image")
                     processMessage(context, message, bitmap)
                 },
 
-                {
-                        error ->
-                    logInfo ("onMessageReceived error image upload: $error")
+                { error ->
+                    logInfo("error upload image: $error")
                     processMessage(context, message, null)
 
                 }
             )
 
         } else {
-            logInfo("onMessageReceived without image url")
+            logInfo("message without image url")
             processMessage(context, message, null)
         }
 
         initRetrofit(context)
         initPreferences(context)
+
     }
 
 
@@ -744,7 +734,7 @@ object EnkodPushLibrary {
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
-    internal fun createdNotificationForNetworkService(context: Context): Notification {
+    internal fun createdNotificationForService(context: Context): Notification {
 
         val CHANNEL_ID = "my_channel_service"
         val channel = NotificationChannel(
@@ -766,7 +756,6 @@ object EnkodPushLibrary {
                 .setForegroundServiceBehavior(FOREGROUND_SERVICE_IMMEDIATE)
         }
 
-
         builder
             .setContentTitle("")
             .setContentText("").build()
@@ -775,7 +764,7 @@ object EnkodPushLibrary {
         return builder.build()
     }
 
-    fun createNotificationChannelForPush (context: Context) {
+    private fun createNotificationChannelForPush(context: Context) {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val name = "Notification Title"
@@ -793,7 +782,7 @@ object EnkodPushLibrary {
         }
     }
 
-    fun createNotification(context: Context, message: Map<String, String>, image: Bitmap?) {
+    private fun createNotification(context: Context, message: Map<String, String>, image: Bitmap?) {
 
         with(message) {
 
@@ -842,7 +831,7 @@ object EnkodPushLibrary {
                         )
                 } catch (e: Exception) {
 
-                    logInfo("error push img builder" )
+                    logInfo("error push img builder")
                 }
             }
 
@@ -860,7 +849,7 @@ object EnkodPushLibrary {
 
                 notify(messageID, builder.build())
 
-               pushLoadObserver.value = true
+                pushLoadObserver.value = true
 
             }
         }
@@ -875,17 +864,19 @@ object EnkodPushLibrary {
     ): PendingIntent {
 
         val intent =
-            if (field == "1") {
-                getOpenUrlIntent(context, data, url)
-            } else if (data["intent"] == "1") {
-                getOpenUrlIntent(context, data, "null")
-            } else if (field == "0") {
-                getDynamicLinkIntent(context, data, url)
-            } else if (data["intent"] == "0")
-                getDynamicLinkIntent(context, data, "null")
-            else {
 
-                getOpenAppIntent(context)
+            when (field) {
+                "0" -> getDynamicLinkIntent(context, data, url)
+                "1" -> getOpenUrlIntent(context, data, url)
+                "2" -> getOpenAppIntent(context)
+                else -> {
+                    when (data["intent"]) {
+                        "0" -> getDynamicLinkIntent(context, data, data["url"] ?: "null")
+                        "1" -> getOpenUrlIntent(context, data, data["url"] ?: "null")
+                        "2" -> getOpenAppIntent(context)
+                        else -> getOpenAppIntent(context)
+                    }
+                }
             }
 
         intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -995,7 +986,7 @@ object EnkodPushLibrary {
                 )
             }
         } else {
-            logInfo("GET INTENT ${OpenIntent.get(data[intentName])} ${data[intentName]} ${data[url]}")
+
             return Intent(context, OnOpenActivity::class.java).also {
                 it.putExtra(intentName, OpenIntent.OPEN_URL.get())
                 it.putExtra(url, data[url])
@@ -1042,6 +1033,7 @@ object EnkodPushLibrary {
     }
 
     fun handleExtras(context: Context, extras: Bundle) {
+
         val link = extras.getString(url)
         sendPushClickInfo(extras, context)
         when (OpenIntent.get(extras.getString(intentName))) {
@@ -1057,10 +1049,18 @@ object EnkodPushLibrary {
                     onDynamicLinkClick?.let { callback ->
                         return callback(it)
                     }
-                    context.startActivity(
-                        Intent(Intent.ACTION_VIEW)
-                            .setData(Uri.parse(link))
-                    )
+                    try {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW)
+                                .setData(Uri.parse(link))
+                        )
+                        initRetrofit(context)
+                        initPreferences(context)
+                        startSession()
+                    } catch (e: Exception) {
+                        logInfo("error opening deep link")
+                        context.startActivity(getPackageLauncherIntent(context))
+                    }
                 }
             }
 
@@ -1088,15 +1088,18 @@ object EnkodPushLibrary {
         val intent = extras.getString(intentName, "2").toInt()
         val url = extras.getString(url)
 
+        logInfo("push click: intent: $intent, url: $url")
+
         val messageID = when (preferencesMessageId) {
             null -> -1
             else -> preferencesMessageId.toInt()
         }
 
         val sessionID = when (preferencesSessionId) {
-            null ->  ""
+            null -> ""
             else -> preferencesSessionId
         }
+
 
         initRetrofit(context)
 
@@ -1118,7 +1121,7 @@ object EnkodPushLibrary {
                 call: Call<PushClickBody>,
                 response: Response<PushClickBody>
             ) {
-                val msg = "succsess"
+                val msg = "push click success"
                 response.code()
                 onPushClickCallback(extras, msg)
             }
@@ -1134,15 +1137,15 @@ object EnkodPushLibrary {
 
     }
 
-    fun PageOpen(url: String){
-        if (url.isEmpty()){
+    fun PageOpen(url: String) {
+        if (url.isEmpty()) {
             return
         }
         retrofit.pageOpen(
             getClientName(),
             getSession(),
             PageUrl(url)
-        ).enqueue(object : Callback<Unit>{
+        ).enqueue(object : Callback<Unit> {
             override fun onResponse(call: Call<Unit>, response: Response<Unit>) {
                 val msg = "page opened"
                 logInfo(msg)
@@ -1171,8 +1174,7 @@ object EnkodPushLibrary {
             mContext.startActivity(i)
         }
     }
- }
-
+}
 
 
 class InitLibObserver<T>(private val defaultValue: T) {
@@ -1202,20 +1204,28 @@ class StartTokenAutoUpdateObserver<T>(private val defaultValue: T) {
     val observable = BehaviorSubject.create<T>(value)
 }
 
+class StartTokenManualUpdateObserver<T>(private val defaultValue: T) {
+    var value: T = defaultValue
+        set(value) {
+            field = value
+            observable.onNext(value)
+        }
+    val observable = BehaviorSubject.create<T>(value)
+}
 
-class LoadImageWorker (context: Context, workerParameters: WorkerParameters) :
-    Worker(context, workerParameters) {
+class LoadImageWorker(context: Context, workerParameters: WorkerParameters) :
+    CoroutineWorker(context, workerParameters) {
 
     @SuppressLint("CheckResult")
-    override fun doWork(): Result {
+    override suspend fun doWork(): Result {
 
-        Log.d("onMessageReceived", "doWork")
+        logInfo("load image worker start")
 
         return try {
 
             val inputData = inputData
 
-            val message = inputData.keyValueMap as Map<String,String>
+            val message = inputData.keyValueMap as Map<String, String>
 
             EnkodPushLibrary.managingTheNotificationCreationProcess(applicationContext, message)
 
@@ -1226,6 +1236,10 @@ class LoadImageWorker (context: Context, workerParameters: WorkerParameters) :
         }
     }
 }
+
+
+
+
 
 
 
