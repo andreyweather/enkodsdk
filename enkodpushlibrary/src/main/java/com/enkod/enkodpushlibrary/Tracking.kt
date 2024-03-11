@@ -301,7 +301,7 @@ object Tracking {
         }
     }
 
-    fun productBuy(orderId: String?, products: List<Order>, orderDatetime: String? = null) {
+    fun productBuy(products: List<Order>, params: Map <String, Any>? = null, orderId: String? = null, orderDatetime: String? = null) {
 
         EnkodPushLibrary.initLibObserver.observable.subscribe {
 
@@ -384,15 +384,43 @@ object Tracking {
                     }
                 }
 
+
                 orderInfo.add("items", items)
 
                 orderInfo.add("order", JsonObject().apply {
 
                         addProperty("sum", purchaseAmount)
 
+                    if (params != null) {
+                        val paramMap = params
+
+                        for (key in paramMap!!.keys) {
+
+                            val value = paramMap[key]
+
+                            try {
+
+                                when (value) {
+
+                                    is String -> addProperty(key, value)
+                                    is Int -> addProperty(key, value)
+                                    is Boolean -> addProperty(key, value)
+                                    is Float -> addProperty(key, value)
+                                    is Double -> addProperty(key, value)
+                                    else -> addProperty(key, value.toString())
+
+                                }
+                            } catch (e: Exception) {
+                                EnkodPushLibrary.logInfo("error createMapHistory $e")
+                            }
+                        }
+                    }
+
                      if (!orderDatetime.isNullOrEmpty()) {
                          addProperty("orderDatetime", orderDatetime)
                      }
+
+
                 })
 
                 val req = JsonObject().apply {
