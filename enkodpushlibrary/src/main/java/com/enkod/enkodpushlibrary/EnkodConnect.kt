@@ -20,11 +20,11 @@ import com.google.firebase.messaging.FirebaseMessaging
 class EnkodConnect(
 
     _account: String?,
-    _usingFcm: Boolean?,
-    _tokenManualUpdate: Boolean?,
-    _tokenAutoUpdate: Boolean?,
-    _timeTokenManualUpdate: Int?,
-    _timeTokenAutoUpdate: Int?
+    _usingFcm: Boolean? = false,
+    _tokenManualUpdate: Boolean? = true,
+    _tokenAutoUpdate: Boolean? = true,
+    _timeTokenManualUpdate: Int? = null,
+    _timeTokenAutoUpdate: Int? = null
 
 ) {
 

@@ -10,13 +10,12 @@ data class Product(
 )
 
 data class Order(
+
     var id: String?,
-    var productId: String?,
     var count: Int?,
     var price: String?,
-    var picture: String?,
-    var sum: Double?,
     var params: Map <String, Any>? = null
+
 )
 
 data class PageUrl(

@@ -301,71 +301,102 @@ object Tracking {
         }
     }
 
-    fun productBuy(order: Order) {
+    fun productBuy(orderId: String?, products: List<Order>, orderDatetime: String? = null) {
 
         EnkodPushLibrary.initLibObserver.observable.subscribe {
 
             if (it) {
 
-                if (order.id.isNullOrEmpty()) {
-                    order.id = UUID.randomUUID().toString()
+                val buyId = if (!orderId.isNullOrEmpty()) {
+
+                    orderId
+
+                }else {
+                    UUID.randomUUID().toString()
                 }
 
                 val orderInfo = JsonObject()
                 val items = JsonArray()
+                var purchaseAmount = 0.0
 
-                val position = JsonObject()
-                position.addProperty("productId", order.productId)
+                for (pos in products) {
 
-                items.add(position)
+                    if (!pos.id.isNullOrEmpty() && !pos.price.isNullOrEmpty() && pos.count != null) {
+
+                        val position = JsonObject().apply {
+
+                                addProperty("productId", pos.id)
+
+                                addProperty("price", pos.price)
+
+                                addProperty("count", pos.count)
+
+
+                            if (pos.params != null) {
+                                val paramMap = pos.params
+
+                                for (key in paramMap!!.keys) {
+
+                                    val value = paramMap[key]
+
+                                    try {
+
+                                        when (value) {
+
+                                            is String -> addProperty(key, value)
+                                            is Int -> addProperty(key, value)
+                                            is Boolean -> addProperty(key, value)
+                                            is Float -> addProperty(key, value)
+                                            is Double -> addProperty(key, value)
+                                            else -> addProperty(key, value.toString())
+
+                                        }
+                                    } catch (e: Exception) {
+                                        EnkodPushLibrary.logInfo("error createMapHistory $e")
+                                    }
+                                }
+                            }
+                        }
+
+                        val priceAsDouble = try {
+                                pos.price?.toDouble()
+                        } catch (e: Exception) {
+                            0.0
+                        }
+
+                        val countAsDouble = try {
+                                pos.count?.toDouble()
+                        } catch (e: Exception) {
+                            0.0
+                        }
+
+                        if (priceAsDouble != null && countAsDouble != null)  {
+
+                            purchaseAmount += priceAsDouble * countAsDouble
+
+                            when (priceAsDouble * countAsDouble) {
+
+                                0.0 -> return@subscribe
+                                else -> items.add(position)
+
+                            }
+                        }
+                    }
+                }
 
                 orderInfo.add("items", items)
 
                 orderInfo.add("order", JsonObject().apply {
-                    if (order.sum != null) {
-                        addProperty("sum", order.sum)
-                    }
-                    if (order.price != null) {
-                        addProperty("price", order.price)
-                    }
-                    if (order.productId != null) {
-                        addProperty("productId", order.productId)
-                    }
-                    if (order.count != null) {
-                        addProperty("count", order.count)
-                    }
-                    if (order.picture != null) {
-                        addProperty("picture", order.picture)
-                    }
 
-                    if (order.params != null) {
-                        val paramMap = order.params
+                        addProperty("sum", purchaseAmount)
 
-                        for (key in paramMap!!.keys) {
-
-                            val value = paramMap[key]
-
-                            try {
-
-                                when (value) {
-
-                                    is String -> addProperty(key, value)
-                                    is Int -> addProperty(key, value)
-                                    is Boolean -> addProperty(key, value)
-                                    is Float -> addProperty(key, value)
-                                    is Double -> addProperty(key, value)
-                                    else -> addProperty(key, value.toString())
-
-                                }
-                            } catch (e: Exception) {
-                                EnkodPushLibrary.logInfo("error createMapHistory $e")
-                            }
-                        }
-                    }
+                     if (!orderDatetime.isNullOrEmpty()) {
+                         addProperty("orderDatetime", orderDatetime)
+                     }
                 })
 
                 val req = JsonObject().apply {
-                    addProperty("orderId", order.id)
+                    addProperty("orderId", buyId)
                     add("orderInfo", orderInfo)
                 }
                 Log.d("buy", req.toString())
