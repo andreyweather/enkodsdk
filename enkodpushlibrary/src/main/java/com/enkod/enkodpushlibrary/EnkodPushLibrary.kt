@@ -410,81 +410,84 @@ object EnkodPushLibrary {
         params: Map<String, String>? = null
 
     ) {
+        var initLib = false
 
-        initLibObserver.observable.subscribe {
+        initLibObserver.observable.subscribe {init ->
+
+            initLib = init
+
+        }
+
+        if (initLib) {
 
             Log.d("observable", "ok")
 
-            if (it) {
+            Log.d("observable", "in contact")
 
-                Log.d("observable", "in contact")
+            if (isOnline) {
 
-                if (isOnline) {
+                val req = JsonObject()
 
-                    val req = JsonObject()
-
-                    if (!email.isNullOrEmpty() && !phone.isNullOrEmpty()) {
-                        req.add("mainChannel", Gson().toJsonTree("email"))
-                    } else if (!email.isNullOrEmpty() && phone.isNullOrEmpty()) {
-                        req.add("mainChannel", Gson().toJsonTree("email"))
-                    } else if (email.isNullOrEmpty() && !phone.isNullOrEmpty()) {
-                        req.add("mainChannel", Gson().toJsonTree("phone"))
-                    }
-
-
-                    val fileds = JsonObject()
-
-                    if (!params.isNullOrEmpty()) {
-
-                        val keys = params.keys
-
-                        for (i in keys.indices) {
-
-                            fileds.addProperty(
-                                keys.elementAt(i),
-                                params.getValue(keys.elementAt(i))
-                            )
-                        }
-                    }
-
-                    if (!email.isNullOrEmpty()) {
-                        fileds.addProperty("email", email)
-                    }
-
-                    if (!phone.isNullOrEmpty()) {
-                        fileds.addProperty("phone", phone)
-                    }
-
-                    val source = "mobile"
-
-                    req.addProperty("source", source)
-
-                    req.add("fields", fileds)
-
-                    Log.d("req_json", req.toString())
-
-                    retrofit.subscribe(
-                        getClientName(),
-                        sessionId!!,
-                        req
-
-                    ).enqueue(object : Callback<Unit> {
-                        override fun onResponse(
-                            call: Call<Unit>,
-                            response: Response<Unit>
-                        ) {
-                            logInfo("add contact")
-                        }
-
-                        override fun onFailure(call: Call<Unit>, t: Throwable) {
-                            val msg = "error when subscribing: ${t.localizedMessage}"
-                            logInfo("error add contact $t")
-                            onErrorCallback(msg)
-                        }
-                    })
-                } else {
-                    logInfo("error add contact no Internet")
+                if (!email.isNullOrEmpty() && !phone.isNullOrEmpty()) {
+                    req.add("mainChannel", Gson().toJsonTree("email"))
+                } else if (!email.isNullOrEmpty() && phone.isNullOrEmpty()) {
+                    req.add("mainChannel", Gson().toJsonTree("email"))
+                } else if (email.isNullOrEmpty() && !phone.isNullOrEmpty()) {
+                    req.add("mainChannel", Gson().toJsonTree("phone"))
                 }
+
+                val fileds = JsonObject()
+
+                if (!params.isNullOrEmpty()) {
+
+                    val keys = params.keys
+
+                    for (i in keys.indices) {
+
+                        fileds.addProperty(
+                            keys.elementAt(i),
+                            params.getValue(keys.elementAt(i))
+                        )
+                    }
+                }
+
+                if (!email.isNullOrEmpty()) {
+                    fileds.addProperty("email", email)
+                }
+
+                if (!phone.isNullOrEmpty()) {
+                    fileds.addProperty("phone", phone)
+                }
+
+                val source = "mobile"
+
+                req.addProperty("source", source)
+
+                req.add("fields", fileds)
+
+                Log.d("req_json", req.toString())
+
+                retrofit.subscribe(
+                    getClientName(),
+                    sessionId!!,
+                    req
+
+                ).enqueue(object : Callback<Unit> {
+                    override fun onResponse(
+                        call: Call<Unit>,
+                        response: Response<Unit>
+                    ) {
+                        logInfo("add contact")
+                    }
+
+                    override fun onFailure(call: Call<Unit>, t: Throwable) {
+                        val msg = "error when subscribing: ${t.localizedMessage}"
+                        logInfo("error add contact $t")
+                        onErrorCallback(msg)
+                    }
+                })
+            } else {
+                logInfo("error add contact no Internet")
             }
         }
     }
