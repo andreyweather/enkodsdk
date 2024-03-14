@@ -92,6 +92,8 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
                         }
                     }
                 }
+            } else {
+                managingTheNotificationCreationProcess(applicationContext, dataFromPush)
             }
 
             preferences.edit()
@@ -101,12 +103,7 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
                 .putString(MESSAGEID_TAG, "${dataFromPush[messageId]}")
                 .apply()
 
-
-            if (Build.VERSION.SDK_INT < 31) {
-                managingTheNotificationCreationProcess(applicationContext, dataFromPush)
-            }
-        }
-        else return
+        } else return
     }
 }
 
