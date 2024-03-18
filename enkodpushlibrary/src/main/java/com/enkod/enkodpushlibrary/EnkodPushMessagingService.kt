@@ -1,5 +1,17 @@
 package com.enkod.enkodpushlibrary
 
+
+
+
+
+
+
+
+
+
+
+
+
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
@@ -73,6 +85,7 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
 
                     if (Build.VERSION.SDK_INT < 31) {
+
                         Log.d("Build.VERSION", Build.VERSION.SDK_INT.toString())
                         val service = Intent(this, InternetService::class.java)
                         this.startForegroundService(service)
@@ -92,8 +105,16 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
                         }
                     }
                 }
+
             } else {
                 managingTheNotificationCreationProcess(applicationContext, dataFromPush)
+            }
+
+            if (Build.VERSION.SDK_INT < 31) {
+                managingTheNotificationCreationProcess(
+                    applicationContext,
+                    dataFromPush
+                )
             }
 
             preferences.edit()
@@ -106,17 +127,4 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
         } else return
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
 

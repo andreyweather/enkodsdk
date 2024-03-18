@@ -81,6 +81,8 @@ class InternetService : Service() {
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 if (Build.VERSION.SDK_INT >= 34) {
+
+                    logInfo("startSelf api >= 34")
                     startForeground(
                         1,
                         createdNotificationForService(applicationContext),
@@ -88,6 +90,7 @@ class InternetService : Service() {
                     )
                 }else {
 
+                    logInfo("startSelf api < 34")
                     startForeground(1, createdNotificationForService(applicationContext))
                 }
             }
