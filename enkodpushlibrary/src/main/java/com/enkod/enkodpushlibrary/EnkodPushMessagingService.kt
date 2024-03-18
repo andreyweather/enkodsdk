@@ -1,22 +1,11 @@
 package com.enkod.enkodpushlibrary
 
-
-
-
-
-
-
-
-
-
-
-
-
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.util.Log
+import androidx.work.Constraints
+import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
@@ -63,59 +52,117 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
             val dataFromPush =
                 creatureInputDataFromMessage(message).keyValueMap as Map<String, String>
 
+            val constraint =
+                Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+
             fun showPushWorkManager() {
 
-                logInfo("show push with expedition work manager")
+                if (Build.VERSION.SDK_INT >= 31) {
 
-                val workRequest = OneTimeWorkRequestBuilder<LoadImageWorker>()
+                    logInfo("show push with expedition work manager api level >= 31")
 
-                    .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-                    .setInputData(creatureInputDataFromMessage(message))
-                    .build()
+                    val workRequest = OneTimeWorkRequestBuilder<LoadImageWorker>()
 
-                WorkManager
+                        .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                        .setInputData(creatureInputDataFromMessage(message))
+                        .build()
 
-                    .getInstance(applicationContext)
-                    .enqueue(workRequest)
+                    WorkManager
 
+                        .getInstance(applicationContext)
+                        .enqueue(workRequest)
+
+                } else if (Build.VERSION.SDK_INT < 31) {
+
+                    logInfo("show push with work manager api level < 31")
+
+                    val workRequest = OneTimeWorkRequestBuilder<LoadImageWorker>()
+
+                        .setConstraints(constraint)
+                        .setInputData(creatureInputDataFromMessage(message))
+                        .build()
+
+                    WorkManager
+
+                        .getInstance(applicationContext)
+                        .enqueue(workRequest)
+
+                }
             }
+
+            fun choosingNotificationProcessTopApi () {
+                when (message.priority) {
+
+                    1 -> managingTheNotificationCreationProcess(
+                        applicationContext,
+                        dataFromPush
+                    )
+
+                    2 -> showPushWorkManager()
+                    else -> showPushWorkManager()
+
+                }
+            }
+
 
             if (!isAppInforegrounded()) {
 
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (!message.data["image"].isNullOrEmpty()) {
 
                     if (Build.VERSION.SDK_INT < 31) {
 
-                        Log.d("Build.VERSION", Build.VERSION.SDK_INT.toString())
                         val service = Intent(this, InternetService::class.java)
-                        this.startForegroundService(service)
+
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+
+                            this.startForegroundService(service)
+
+                            choosingNotificationProcessTopApi()
+
+                        } else {
+
+                            when (message.priority) {
+
+                                1 -> managingTheNotificationCreationProcess(
+                                    applicationContext,
+                                    dataFromPush
+                                )
+
+                                2 -> {
+
+                                    this.startService(service)
+
+                                    managingTheNotificationCreationProcess(
+                                        applicationContext,
+                                        dataFromPush
+                                    )
+                                }
+                                else -> {
+
+                                    this.startService(service)
+
+                                    managingTheNotificationCreationProcess(
+                                        applicationContext,
+                                        dataFromPush
+                                    )
+                                }
+                            }
+                        }
 
                     } else if (Build.VERSION.SDK_INT >= 31) {
 
-                        when (message.priority) {
+                        choosingNotificationProcessTopApi()
 
-                            1 -> managingTheNotificationCreationProcess(
-                                applicationContext,
-                                dataFromPush
-                            )
-
-                            2 -> showPushWorkManager()
-                            else -> showPushWorkManager()
-
-                        }
                     }
+
+                } else {
+                    managingTheNotificationCreationProcess(applicationContext, dataFromPush)
                 }
 
             } else {
                 managingTheNotificationCreationProcess(applicationContext, dataFromPush)
             }
 
-            if (Build.VERSION.SDK_INT < 31) {
-                managingTheNotificationCreationProcess(
-                    applicationContext,
-                    dataFromPush
-                )
-            }
 
             preferences.edit()
                 .remove(MESSAGEID_TAG).apply()
@@ -127,4 +174,17 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
         } else return
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
