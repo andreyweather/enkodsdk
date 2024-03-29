@@ -10,10 +10,11 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+
     }
 }
 
 rootProject.name = "EnkodPushLibrary"
 include(":app")
-include(":enkodpushlibrary")
+include(":androidsdk")
  
